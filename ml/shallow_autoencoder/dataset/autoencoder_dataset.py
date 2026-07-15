@@ -200,7 +200,7 @@ class AutoencoderDataset(Dataset):
             # Time to float representing number of hours
             # Sample from exponential distribution to simulate time to open
             mailshot_tto = {
-                user_id: np.random.exponential(abs(time_to_open.total_seconds() / 60))
+                user_id: np.random.exponential(abs(pd.to_timedelta(time_to_open).total_seconds() / 60))
                 if time_to_open
                 else np.inf
                 for user_id, time_to_open in time_to_open.items()
