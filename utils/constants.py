@@ -1,4 +1,4 @@
 import re
 from pathlib import Path
 
-ROOT_FOLDER = Path(re.sub(r"(.*?/YOUR_PROJECT_ROOT_FOLDER/).*", r"\1", __file__))
+ROOT_FOLDER = Path(re.sub(r"(.*?/Active-Learning-for-Email-Interaction-Dynamics/).*", r"\1", __file__))

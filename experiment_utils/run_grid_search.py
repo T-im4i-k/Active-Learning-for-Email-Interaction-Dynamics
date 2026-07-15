@@ -3,10 +3,6 @@ import sys
 from pathlib import Path
 import datetime
 
-# TODO: change the ROOT_FOLDER_NAME
-ROOT_FOLDER = Path(re.sub(r"(.*?/YOUR_PROJECT_ROOT_FOLDER/).*", r"\1", __file__))
-sys.path.append(str(ROOT_FOLDER))
-
 import argparse
 import json
 import logging
@@ -22,6 +18,7 @@ from ml.baselines.factor_ucb import FactorUCBModel
 from ml.baselines.thompson_sampling import ThompsonSamplingModel
 from ml.shallow_autoencoder.contextual_bandit_with_autoencoder import ContextualBanditWithAutoencoder
 from experiment_utils.experiment_constants import get_experiment_folder_path, GRID_SEARCH_FILE_NAME
+
 
 logging.basicConfig(
     format="%(asctime)s : %(levelname)s : %(name)s : %(message)s",

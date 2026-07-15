@@ -10,9 +10,6 @@ import json
 import logging
 from typing import Dict, Any
 
-ROOT_FOLDER = Path(re.sub(r"(.*?/YOUR_PROJECT_ROOT_FOLDER/).*", r"\1", __file__))
-sys.path.append(str(ROOT_FOLDER))
-
 from experiment_utils.experiment_constants import get_experiment_folder_path, GRID_SEARCH_FILE_NAME, \
     generate_timestamp_version
 

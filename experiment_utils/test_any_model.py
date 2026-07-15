@@ -1,11 +1,6 @@
 import re
 import sys
 from pathlib import Path
-
-# TODO: change the ROOT_FOLDER_NAME
-ROOT_FOLDER = Path(re.sub(r"(.*?/YOUR_PROJECT_ROOT_FOLDER/).*", r"\1", __file__))
-sys.path.append(str(ROOT_FOLDER))
-
 import argparse
 import logging
 
