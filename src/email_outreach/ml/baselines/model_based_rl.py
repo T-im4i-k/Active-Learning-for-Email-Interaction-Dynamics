@@ -4,14 +4,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Self, Type
 
-import torch
 import pandas as pd
+import torch
 
 from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
     AbstractConfig,
     AbstractContextualModel,
 )
-from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
+    AutoencoderDataset,
+)
 from email_outreach.ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
 
 logger = logging.getLogger(__name__)
@@ -19,12 +21,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ModelBasedRLConfig(AbstractConfig):
-    gamma: float = 0.9           # discount factor
-    max_streak: int = 5          # cap for the open–streak state
-    n_value_iter: int = 50       # how many value-iteration passes there are
-    alpha_prior: float = 1.0     # Beta prior for successes
-    beta_prior: float = 1.0      # Beta prior for failures
-    kappa: float = 0.0           # Correlation adjustment parameter
+    gamma: float = 0.9  # discount factor
+    max_streak: int = 5  # cap for the open–streak state
+    n_value_iter: int = 50  # how many value-iteration passes there are
+    alpha_prior: float = 1.0  # Beta prior for successes
+    beta_prior: float = 1.0  # Beta prior for failures
+    kappa: float = 0.0  # Correlation adjustment parameter
 
     def to_dict(self):
         return {
@@ -33,7 +35,7 @@ class ModelBasedRLConfig(AbstractConfig):
             "n_value_iter": self.n_value_iter,
             "alpha_prior": self.alpha_prior,
             "beta_prior": self.beta_prior,
-            "kappa": self.kappa
+            "kappa": self.kappa,
         }
 
     def to_filename(self) -> str:
@@ -65,8 +67,8 @@ class ModelBasedRL(AbstractContextualModel):
         super().__init__(config)
         self.cfg: ModelBasedRLConfig = config
 
-        self._p_open: torch.Tensor | None = None       # P(open | streak)
-        self._Q: torch.Tensor | None = None            # Q-table [S, A]
+        self._p_open: torch.Tensor | None = None  # P(open | streak)
+        self._Q: torch.Tensor | None = None  # Q-table [S, A]
 
     def fit(self, train: AutoencoderDataset, val: AutoencoderDataset) -> None:
         """
@@ -81,7 +83,7 @@ class ModelBasedRL(AbstractContextualModel):
         # 1) COMPUTE the streak for every row in the log
         streaks = []
         last_open_streak: Dict[int, int] = {}  # user_id -> current streak
-        for (_, row) in df.iterrows():
+        for _, row in df.iterrows():
             uid = int(row["user_id"])
             opened = int(row["opened"])
             streak = last_open_streak.get(uid, 0)
@@ -115,7 +117,9 @@ class ModelBasedRL(AbstractContextualModel):
         # Adjust probabilities based on kappa
         # When kappa=0, all streaks have the same probability (no causal effect)
         # When kappa=1, use the full observed correlation
-        adjusted_p_open = baseline_open_rate + self.cfg.kappa * (self._p_open - baseline_open_rate)
+        adjusted_p_open = baseline_open_rate + self.cfg.kappa * (
+            self._p_open - baseline_open_rate
+        )
         self._p_open = adjusted_p_open.clamp(min=0.0, max=1.0)
 
         # 3) VALUE / Q COMPUTATION (tabular)
@@ -134,8 +138,10 @@ class ModelBasedRL(AbstractContextualModel):
             #   reward  = p_open
             #   next V  = p_open * V[next_state_open] + (1-p_open) * V[next_state_no_open]
             vs_open = V[next_state_open]
-            vs_no   = V[next_state_no_open]
-            Q_send = self._p_open + gamma * (self._p_open * vs_open + (1 - self._p_open) * vs_no)
+            vs_no = V[next_state_no_open]
+            Q_send = self._p_open + gamma * (
+                self._p_open * vs_open + (1 - self._p_open) * vs_no
+            )
 
             # Action SKIP:
             Q_skip = gamma * V  # reward 0, streak unchanged
@@ -170,7 +176,7 @@ class ModelBasedRL(AbstractContextualModel):
                 .groupby("user_id")
                 .tail(1)
             )
-            for (_, row) in last.iterrows():
+            for _, row in last.iterrows():
                 user_streak[int(row["user_id"])] = int(row.get("streak", 0))
 
         for _, row in df.iterrows():

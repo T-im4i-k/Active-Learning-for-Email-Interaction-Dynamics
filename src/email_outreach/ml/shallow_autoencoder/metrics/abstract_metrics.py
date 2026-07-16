@@ -1,13 +1,13 @@
 import json
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Self, TypeVar
 
 import pandas as pd
 
-
 TMetrics = TypeVar("TMetrics", bound="AbstractMetrics")
+
 
 @dataclass
 class AbstractMetrics(ABC):
@@ -40,13 +40,16 @@ class AbstractMetrics(ABC):
         return [m.to_dict() for m in metrics]
 
     @staticmethod
-    def to_json_file(metrics: List[TMetrics], folder: Path, filename: str = "results.json") -> None:
-        with open(folder / filename, 'w') as f:
+    def to_json_file(
+        metrics: List[TMetrics], folder: Path, filename: str = "results.json"
+    ) -> None:
+        with open(folder / filename, "w") as f:
             json.dump([m.to_dict() for m in metrics], f, indent=4)
 
     @staticmethod
-    def to_csv_gz(metrics: List[TMetrics], folder: Path,
-                  filename: str = "results.csv.gz") -> None:
+    def to_csv_gz(
+        metrics: List[TMetrics], folder: Path, filename: str = "results.csv.gz"
+    ) -> None:
         # Convert metrics to a list of dictionaries
         metrics_dicts = [m.to_dict() for m in metrics]
 
@@ -54,4 +57,4 @@ class AbstractMetrics(ABC):
         df = pd.DataFrame(metrics_dicts)
 
         # Save to compressed CSV
-        df.to_csv(folder / filename, compression='gzip', index=False)
+        df.to_csv(folder / filename, compression="gzip", index=False)

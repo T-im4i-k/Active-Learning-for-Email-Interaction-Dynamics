@@ -1,12 +1,11 @@
+import argparse
+import datetime
+import json
+import logging
 import re
 import sys
 from pathlib import Path
-import datetime
-
-import argparse
-import json
-import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 from email_outreach.experiment_utils.experiment_constants import (
     GRID_SEARCH_FILE_NAME,
@@ -24,12 +23,12 @@ from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder im
     ContextualBanditWithAutoencoder,
 )
 
-
 logging.basicConfig(
     format="%(asctime)s : %(levelname)s : %(name)s : %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
 
 def get_model_class(model_name: str):
     """Get the model class for the specified model name."""
@@ -46,19 +45,23 @@ def get_model_class(model_name: str):
     }
 
     if model_name not in model_classes:
-        raise ValueError(f"Unknown model: {model_name}. Available models: {list(model_classes.keys())}")
+        raise ValueError(
+            f"Unknown model: {model_name}. Available models: {list(model_classes.keys())}"
+        )
 
     return model_classes[model_name]
 
 
-def load_config(config_folder: Path, config_file: str = GRID_SEARCH_FILE_NAME) -> Dict[str, Any]:
+def load_config(
+    config_folder: Path, config_file: str = GRID_SEARCH_FILE_NAME
+) -> Dict[str, Any]:
     """Load configuration from JSON file."""
     config_path = config_folder / config_file
 
     if not config_path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_file}")
 
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = json.load(f)
 
     # Validate required fields
@@ -96,7 +99,9 @@ def generate_timestamp_version() -> str:
     return now.strftime("%Y%m%d-%H%M%S")
 
 
-def save_config_to_experiment_folder(sender_id: int, model_name: str, version: str, config: Dict[str, Any]) -> None:
+def save_config_to_experiment_folder(
+    sender_id: int, model_name: str, version: str, config: Dict[str, Any]
+) -> None:
     """Save the configuration to the experiment folder as grid_search_config.json."""
     experiment_folder = get_experiment_folder_path(sender_id, model_name, version)
 
@@ -105,7 +110,7 @@ def save_config_to_experiment_folder(sender_id: int, model_name: str, version: s
 
     # Save config to the experiment folder
     config_path = experiment_folder / "grid_search_config.json"
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         json.dump(config, f, indent=4)
 
     logger.info(f"Configuration saved to: {config_path}")
@@ -115,12 +120,31 @@ def main():
     parser = argparse.ArgumentParser(
         description="Run grid search based on a configuration file"
     )
-    parser.add_argument("--sender_id", type=int, help="Sender ID (overrides config file if provided)")
-    parser.add_argument("--model", type=str, help="Model name (overrides config file if provided)")
-    parser.add_argument("--version", type=str, help="Experiment version (overrides config file if provided)")
-    parser.add_argument("--split_sizes", type=int, nargs=2, default=[5, 10], help="Split sizes for validation and test sets")
+    parser.add_argument(
+        "--sender_id", type=int, help="Sender ID (overrides config file if provided)"
+    )
+    parser.add_argument(
+        "--model", type=str, help="Model name (overrides config file if provided)"
+    )
+    parser.add_argument(
+        "--version",
+        type=str,
+        help="Experiment version (overrides config file if provided)",
+    )
+    parser.add_argument(
+        "--split_sizes",
+        type=int,
+        nargs=2,
+        default=[5, 10],
+        help="Split sizes for validation and test sets",
+    )
     parser.add_argument("--n_jobs", type=int, default=1)
-    parser.add_argument("--n_samples", type=int, default=None, help="Number of samples to use for grid search")
+    parser.add_argument(
+        "--n_samples",
+        type=int,
+        default=None,
+        help="Number of samples to use for grid search",
+    )
 
     args = parser.parse_args()
 
@@ -144,7 +168,9 @@ def main():
         logger.info(f"Using auto-generated timestamp version: {version}")
 
     model_class = get_model_class(model_name)
-    results_folder = get_experiment_folder_path(sender_id, model_class.model_name(), version)
+    results_folder = get_experiment_folder_path(
+        sender_id, model_class.model_name(), version
+    )
     config: Dict[str, Any] = load_config(config_folder=results_folder)
 
     # Extract parameters from config
@@ -168,7 +194,7 @@ def main():
         "param_grid": param_grid,
         "n_samples": n_samples,
         "n_jobs": n_jobs,
-        "random_state": random_state
+        "random_state": random_state,
     }
 
     # Save configuration to an experiment folder
@@ -176,7 +202,7 @@ def main():
         sender_id=sender_id,
         model_name=model_name,
         version=version,
-        config=complete_config
+        config=complete_config,
     )
 
     # Run grid search
@@ -187,7 +213,7 @@ def main():
         param_grid=param_grid,
         n_samples=n_samples,
         n_jobs=n_jobs,
-        random_state=random_state
+        random_state=random_state,
     )
 
     # Log results location
@@ -195,5 +221,5 @@ def main():
     logger.info(f"Results saved to: {results_folder}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

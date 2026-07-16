@@ -1,10 +1,12 @@
+import argparse
+import logging
 import re
 import sys
 from pathlib import Path
-import argparse
-import logging
 
-from email_outreach.experiment_utils.experiment_constants import EXPERIMENT_RESULTS_FOLDER_NAME
+from email_outreach.experiment_utils.experiment_constants import (
+    EXPERIMENT_RESULTS_FOLDER_NAME,
+)
 from email_outreach.ml.baselines.ddqn_linkedin import DoubleDQNTrainer
 from email_outreach.ml.baselines.factor_ucb import FactorUCBModel
 from email_outreach.ml.baselines.fmfcdb import FMFCDBModel
@@ -14,7 +16,7 @@ from email_outreach.ml.baselines.model_based_rl import ModelBasedRL
 from email_outreach.ml.baselines.random_model import RandomModel
 from email_outreach.ml.baselines.thompson_sampling import ThompsonSamplingModel
 from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
-    ContextualBanditWithAutoencoder
+    ContextualBanditWithAutoencoder,
 )
 
 # Ensure ROOT_FOLDER is in the system path
@@ -27,8 +29,19 @@ logger = logging.getLogger(__name__)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--sender_id", type=int, help="Sender ID")
-parser.add_argument("--repetitions", type=int, default=1, help="Number of repetitions for each experiment")
-parser.add_argument("--split_sizes", nargs="+", default=[10], type=int, help="How should the dataset be split?")
+parser.add_argument(
+    "--repetitions",
+    type=int,
+    default=1,
+    help="Number of repetitions for each experiment",
+)
+parser.add_argument(
+    "--split_sizes",
+    nargs="+",
+    default=[10],
+    type=int,
+    help="How should the dataset be split?",
+)
 parser.add_argument("--experiment_version", type=str, help="Experiment version")
 parser.add_argument("--model", type=str, default="contextual_bandit", help="Model name")
 
@@ -63,10 +76,15 @@ def main():
     else:
         raise ValueError(f"Unknown model: {model}")
 
-    model_class.test(sender_id=sender_id, split_sizes=split_sizes, repetitions=repetitions, version=experiment_version)
+    model_class.test(
+        sender_id=sender_id,
+        split_sizes=split_sizes,
+        repetitions=repetitions,
+        version=experiment_version,
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger.info(f"Testing started...")
     main()
     logger.info(f"Starting testing {EXPERIMENT_RESULTS_FOLDER_NAME}")

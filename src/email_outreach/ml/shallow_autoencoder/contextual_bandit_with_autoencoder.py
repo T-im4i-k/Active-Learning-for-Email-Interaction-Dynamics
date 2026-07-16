@@ -4,20 +4,27 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple, Self, Type
+from typing import Dict, List, Optional, Self, Set, Tuple, Type
 
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
-from email_outreach.experiment_utils.experiment_constants import CONTEXTUAL_BANDIT_FOLDER_NAME
+from email_outreach.experiment_utils.experiment_constants import (
+    CONTEXTUAL_BANDIT_FOLDER_NAME,
+)
 from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
     AbstractConfig,
     AbstractContextualModel,
     ContextualBanditMetrics,
 )
-from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
-from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import ShallowAutoencoder, TrainingMetrics
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
+    AutoencoderDataset,
+)
+from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
+    ShallowAutoencoder,
+    TrainingMetrics,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +51,8 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
         return (
             f"d={self.d}-epochs={self.epochs}-lr={self.lr}-wd={self.wd}-batch_size={self.batch_size}-positive_weight="
             f"{self.positive_weight}-s_alpha={self.s_alpha}-G={self.G}-layer_norm={self.layer_norm}-num_splits={self.num_splits}"
-            f"-T={self.T}-sent_by_T={self.sent_by_T}-dropout={self.dropout}-flipped={self.flipped}-j={self.j}")
+            f"-T={self.T}-sent_by_T={self.sent_by_T}-dropout={self.dropout}-flipped={self.flipped}-j={self.j}"
+        )
 
     def to_dict(self):
         return {
@@ -67,7 +75,7 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
 
     @classmethod
     def from_json_file(cls, folder: Path, filename: str = "config.json") -> Self:
-        with open(folder / filename, 'r') as f:
+        with open(folder / filename, "r") as f:
             data = json.load(f)
         return cls(
             d=data.get("d", 10),
@@ -84,14 +92,15 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             sent_by_T=data.get("sent_by_T", 0.15),  # Sent by T of all users
             j=data.get("j", 0),  # Repetition of the experiment
             dropout=data.get("dropout", 0.0),
-            flipped=data.get("flipped", False)
+            flipped=data.get("flipped", False),
         )
 
     def to_filename(self):
         return (
             f"d={self.d}-epochs={self.epochs}-lr={self.lr}-wd={self.wd}-batch_size={self.batch_size}-positive_weight="
             f"{self.positive_weight}-s_alpha={self.s_alpha}-G={self.G}-layer_norm={self.layer_norm}-num_splits={self.num_splits}"
-            f"-T={self.T}-sent_by_T={self.sent_by_T}-dropout={self.dropout}-flipped={self.flipped}-j={self.j}")
+            f"-T={self.T}-sent_by_T={self.sent_by_T}-dropout={self.dropout}-flipped={self.flipped}-j={self.j}"
+        )
 
     @classmethod
     def from_filename(cls, filename: str):
@@ -111,9 +120,23 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
         dropout = float(parts[12].split("=")[1])
         flipped = parts[13].split("=")[1] == "True"
         j = int(parts[14].split("=")[1])
-        return cls(d=d, epochs=epochs, lr=lr, wd=wd, batch_size=batch_size, positive_weight=positive_weight,
-                   s_alpha=s_alpha, G=G, layer_norm=layer_norm, num_splits=num_splits, T=T, sent_by_T=sent_by_T, j=j,
-                   dropout=dropout, flipped=flipped)
+        return cls(
+            d=d,
+            epochs=epochs,
+            lr=lr,
+            wd=wd,
+            batch_size=batch_size,
+            positive_weight=positive_weight,
+            s_alpha=s_alpha,
+            G=G,
+            layer_norm=layer_norm,
+            num_splits=num_splits,
+            T=T,
+            sent_by_T=sent_by_T,
+            j=j,
+            dropout=dropout,
+            flipped=flipped,
+        )
 
 
 class ContextualBanditWithAutoencoder(AbstractContextualModel):
@@ -153,16 +176,32 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             raise ValueError("Autoencoder not fitted yet")
         return self._autoencoder
 
-    def fit(self, train: AutoencoderDataset | torch.Tensor, val: AutoencoderDataset | torch.Tensor) -> None:
+    def fit(
+        self,
+        train: AutoencoderDataset | torch.Tensor,
+        val: AutoencoderDataset | torch.Tensor,
+    ) -> None:
         super().fit(train, val)
-        self._autoencoder = ShallowAutoencoder(n=train.num_users, d=self.config.d, layer_norm=self.config.layer_norm, dropout_p=self.config.dropout)
+        self._autoencoder = ShallowAutoencoder(
+            n=train.num_users,
+            d=self.config.d,
+            layer_norm=self.config.layer_norm,
+            dropout_p=self.config.dropout,
+        )
         self.last_p: torch.Tensor = torch.zeros(train.num_users)
         self.last_prenormalized_f: torch.Tensor = torch.zeros(train.num_users)
 
         logger.info("Fitting the autoencoder")
-        self.autoencoder.fit(self.train, epochs=self.config.epochs, lr=self.config.lr,
-                             batch_size=self.config.batch_size, weight_decay=self.config.wd,
-                             positive_weight=self.config.positive_weight, val=self.val, full_training=True)
+        self.autoencoder.fit(
+            self.train,
+            epochs=self.config.epochs,
+            lr=self.config.lr,
+            batch_size=self.config.batch_size,
+            weight_decay=self.config.wd,
+            positive_weight=self.config.positive_weight,
+            val=self.val,
+            full_training=True,
+        )
         # TrainingMetrics.plot_average_ndcg(self.autoencoder.training_metrics)
         # TrainingMetrics.plot_f1_score(self.autoencoder.training_metrics)
         if self.show_plots:
@@ -197,11 +236,21 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             newly_opened: Set[int] = set()
             for i in range(num_splits):
                 # logger.info(f"Predicting batch {i}")
-                predicted_batch, predicted_scores = self.predict_batch(mailshot_users, already_sent, opened, initial_batch_size, newly_opened)
+                predicted_batch, predicted_scores = self.predict_batch(
+                    mailshot_users,
+                    already_sent,
+                    opened,
+                    initial_batch_size,
+                    newly_opened,
+                )
                 already_sent.extend(predicted_batch)
                 already_scored.extend(predicted_scores)
                 sent_at_stage.update({user: i for user in predicted_batch})
-                opens_from_batch: Set[int] = set(self.update_opens(data, mailshot_id, sent_at_stage, time_frame_minutes))
+                opens_from_batch: Set[int] = set(
+                    self.update_opens(
+                        data, mailshot_id, sent_at_stage, time_frame_minutes
+                    )
+                )
                 newly_opened = opens_from_batch - all_current_opens
                 # print(newly_opened)
                 all_current_opens.update(opens_from_batch)
@@ -209,8 +258,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 current_opens = len(opens_from_batch)
 
             # Final prediction and metrics
-            predictions: torch.Tensor = self.predict_final_send(mailshot_users, already_sent, opened, newly_opened)
-            metrics: List[ContextualBanditMetrics] = self.final_metrics(mailshot_index, data, mailshot_users, already_sent, predictions)
+            predictions: torch.Tensor = self.predict_final_send(
+                mailshot_users, already_sent, opened, newly_opened
+            )
+            metrics: List[ContextualBanditMetrics] = self.final_metrics(
+                mailshot_index, data, mailshot_users, already_sent, predictions
+            )
             for m in metrics:
                 m.stage = num_splits
 
@@ -225,7 +278,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return all_metrics
 
     @staticmethod
-    def update_opens(dataset: AutoencoderDataset, mailshot_id: int, sent_at_stage: Dict[int, int], frame_minutes: int) -> List[int]:
+    def update_opens(
+        dataset: AutoencoderDataset,
+        mailshot_id: int,
+        sent_at_stage: Dict[int, int],
+        frame_minutes: int,
+    ) -> List[int]:
         opened_indices: List[int] = []
         grouped_sent_at_stage = defaultdict(list)
         # logger.info(f"Updating opens for mailshot {mailshot_id}, keys: {set(sent_at_stage.values())}")
@@ -234,11 +292,21 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             grouped_sent_at_stage[stage].append(user)
 
         for stage, users in grouped_sent_at_stage.items():
-            opened_indices.extend(dataset.select_opened_indices(mailshot_id, users, frame_minutes * (max_stage - stage + 1)))
+            opened_indices.extend(
+                dataset.select_opened_indices(
+                    mailshot_id, users, frame_minutes * (max_stage - stage + 1)
+                )
+            )
 
         return opened_indices
 
-    def calculate_scores(self, user_indices: List[int], sent_indices: List[int], opened: torch.tensor, newly_opened: Set[int]) -> torch.Tensor:
+    def calculate_scores(
+        self,
+        user_indices: List[int],
+        sent_indices: List[int],
+        opened: torch.tensor,
+        newly_opened: Set[int],
+    ) -> torch.Tensor:
         # Calculate p, f, s
         fs: torch.tensor = self.calculate_f(opened, newly_opened)
         if self.last_p.sum() == 0:
@@ -266,9 +334,18 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.user_mask.append(user_mask.detach().numpy())
         return samples
 
-    def predict_batch(self, user_indices: List[int], sent_indices: List[int], opened: torch.tensor, n_best: int, newly_opened: Set[int]) -> Tuple[List[int], List[float]]:
+    def predict_batch(
+        self,
+        user_indices: List[int],
+        sent_indices: List[int],
+        opened: torch.tensor,
+        n_best: int,
+        newly_opened: Set[int],
+    ) -> Tuple[List[int], List[float]]:
         # Calculate p, f, s
-        samples = self.calculate_scores(user_indices, sent_indices, opened, newly_opened)
+        samples = self.calculate_scores(
+            user_indices, sent_indices, opened, newly_opened
+        )
 
         # Select indices of top N samples
         top_indices: List[int] = torch.topk(samples, n_best).indices.tolist()
@@ -280,18 +357,29 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         mask[torch.tensor(user_indices)] = True
         return mask
 
-    def predict_final_send(self, user_indices: List[int], sent_indices: List[int], opened: torch.tensor, newly_opened: Set[int]) -> torch.Tensor:
-        samples = self.calculate_scores(user_indices, sent_indices, opened, newly_opened)
+    def predict_final_send(
+        self,
+        user_indices: List[int],
+        sent_indices: List[int],
+        opened: torch.tensor,
+        newly_opened: Set[int],
+    ) -> torch.Tensor:
+        samples = self.calculate_scores(
+            user_indices, sent_indices, opened, newly_opened
+        )
         return samples
 
-    def final_metrics(self,
-                      mailshot_id: int,
-                      dataset: AutoencoderDataset,
-                      user_indices: List[int],
-                      sent_indices: List[int],
-                      final_predictions: torch.Tensor,
-                      ) -> List[ContextualBanditMetrics]:
-        binary_results: torch.Tensor = dataset[mailshot_id][2]  # 1 because the 0 is masked for training
+    def final_metrics(
+        self,
+        mailshot_id: int,
+        dataset: AutoencoderDataset,
+        user_indices: List[int],
+        sent_indices: List[int],
+        final_predictions: torch.Tensor,
+    ) -> List[ContextualBanditMetrics]:
+        binary_results: torch.Tensor = dataset[mailshot_id][
+            2
+        ]  # 1 because the 0 is masked for training
         prediction = deepcopy(final_predictions)
 
         # Put 1s for sent_indices
@@ -310,7 +398,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             user_mask.tolist(),
             binary_results.tolist(),
             prediction.tolist(),
-            user_clusters
+            user_clusters,
         )
         return metrics
 
@@ -347,17 +435,23 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         all_averages = torch.cat(all_averages)
         # Show only values of true opens
         if self.show_plots:
-            plt.hist(all_averages.detach().numpy().flatten(), bins=100, color='blue')
-            true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(self.current_mailshot)
+            plt.hist(all_averages.detach().numpy().flatten(), bins=100, color="blue")
+            true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(
+                self.current_mailshot
+            )
             averages_of_trues = all_averages[true_opens == 1]
-            plt.hist(averages_of_trues.detach().numpy().flatten(), bins=100, color='orange')
+            plt.hist(
+                averages_of_trues.detach().numpy().flatten(), bins=100, color="orange"
+            )
             plt.title("Histogram of p")
             plt.show()
         # Fill the averages to the input_dim size
         # return torch.ones(all_averages.shape) - all_averages
         return all_averages
 
-    def calculate_f(self, results: torch.Tensor, newly_opened: Set[int]) -> torch.Tensor:
+    def calculate_f(
+        self, results: torch.Tensor, newly_opened: Set[int]
+    ) -> torch.Tensor:
         # logger.info(f"Calculating f Original")
         if results.sum() == 0:
             self.last_prenormalized_f = torch.zeros_like(results)
@@ -371,19 +465,25 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             if self.config.layer_norm:
                 current_f = self.autoencoder.predict(user.unsqueeze(0)).squeeze(0)
             else:
-                current_f = self.autoencoder.predict_for_user(user.unsqueeze(0)).squeeze(0)
+                current_f = self.autoencoder.predict_for_user(
+                    user.unsqueeze(0)
+                ).squeeze(0)
             assert current_f.max() <= 1, f"Max f: {current_f.max()}, should be <=1"
             f += current_f
 
         self.last_prenormalized_f += f
         normalized_f = self.last_prenormalized_f / sum(results)
         if self.graph_for_n_runs > 0 and self.show_plots:
-            plt.hist(normalized_f.detach().numpy().flatten(), bins=100, color='blue')
+            plt.hist(normalized_f.detach().numpy().flatten(), bins=100, color="blue")
             plt.title("Histogram of f")
             # Show only values of true opens
-            true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(self.current_mailshot)
+            true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(
+                self.current_mailshot
+            )
             averages_of_trues = normalized_f[true_opens == 1]
-            plt.hist(averages_of_trues.detach().numpy().flatten(), bins=100, color='orange')
+            plt.hist(
+                averages_of_trues.detach().numpy().flatten(), bins=100, color="orange"
+            )
             self.graph_for_n_runs -= 1
             plt.show()
         if self.config.flipped:
@@ -391,7 +491,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         else:
             return normalized_f
 
-    def calculate_f_ff(self, results: torch.Tensor, newly_opened: Set[int]) -> torch.Tensor:
+    def calculate_f_ff(
+        self, results: torch.Tensor, newly_opened: Set[int]
+    ) -> torch.Tensor:
         logger.info(f"Calculating f FF")
         if results.sum() == 0:
             return torch.zeros_like(results)
@@ -399,12 +501,18 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         current_f = self.autoencoder.predict(results)
         if self.graph_for_n_runs > 0:
             with torch.no_grad():
-                plt.hist(current_f.detach().numpy().flatten(), bins=100, color='blue')
+                plt.hist(current_f.detach().numpy().flatten(), bins=100, color="blue")
                 plt.title("Histogram of f")
                 # Show only values of true opens
-                true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(self.current_mailshot)
+                true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(
+                    self.current_mailshot
+                )
                 averages_of_trues = current_f[true_opens == 1]
-                plt.hist(averages_of_trues.detach().numpy().flatten(), bins=100, color='orange')
+                plt.hist(
+                    averages_of_trues.detach().numpy().flatten(),
+                    bins=100,
+                    color="orange",
+                )
                 self.graph_for_n_runs -= 1
                 plt.show()
         if self.config.flipped:

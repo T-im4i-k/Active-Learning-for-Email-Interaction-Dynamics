@@ -26,13 +26,16 @@ CONTEXTUAL_BANDIT_CONFIG_NAME = "contextual_bandit_config.json"
 
 GRID_SEARCH_FILE_NAME = "grid_search_config.json"
 
+
 def get_experiment_folder_path(sender_id: int, model_name: str, version: str) -> Path:
     return EXPERIMENTS_FOLDER / str(sender_id) / model_name / version
+
 
 def get_test_folder_path(sender_id: int, model_name: str, version: str) -> Path:
     if version is None:
         return Path()
     return TEST_SET_FOLDER / str(sender_id) / model_name / version
+
 
 def generate_timestamp_version() -> str:
     """Generate a version string in the format '20250515-004928' using current timestamp."""

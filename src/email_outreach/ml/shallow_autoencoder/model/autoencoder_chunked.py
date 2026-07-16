@@ -1,15 +1,14 @@
 import logging
 import math
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import List, Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 import torch.optim as optim
 from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset, TensorDataset
-import torch.nn.init as init
+from torch.utils.data import DataLoader, Dataset, TensorDataset
 
 from email_outreach.utils.common_utils import set_seed
 
@@ -19,6 +18,7 @@ from email_outreach.utils.common_utils import set_seed
 # - "Shallow linear autoencoders for collaborative filtering" approaches in related CF literature.
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class TrainingMetrics:
@@ -46,22 +46,27 @@ class TrainingMetrics:
         average_ndcg = [result.average_train_ndcg for result in results]
         print(f"Max average_ndcg: {max(average_ndcg):.4f}")
         print(f"End average_ndcg: {average_ndcg[-1]:.4f}")
-        plt.plot(average_ndcg, label='average_ndcg')
+        plt.plot(average_ndcg, label="average_ndcg")
         plt.legend()
-        plt.xlabel('Epoch')
-        plt.ylabel('NDCG')
+        plt.xlabel("Epoch")
+        plt.ylabel("NDCG")
         plt.show()
-
 
     @staticmethod
     def plot_val_precision_recall(results: List["TrainingMetrics"]):
         val_precision = [result.val_precision for result in results]
         val_recall = [result.val_recall for result in results]
-        print(f"Max val_precision: {max(val_precision):.4f}, Max val_recall: {max(val_recall):.4f}")
-        print(f"End val_precision: {val_precision[-1]:.4f}, End val_recall: {val_recall[-1]:.4f}")
-        print(f"Loss at max val_precision: {results[val_precision.index(max(val_precision))].val_loss:.4f}")
-        plt.plot(val_precision, label='val_precision')
-        plt.plot(val_recall, label='val_recall')
+        print(
+            f"Max val_precision: {max(val_precision):.4f}, Max val_recall: {max(val_recall):.4f}"
+        )
+        print(
+            f"End val_precision: {val_precision[-1]:.4f}, End val_recall: {val_recall[-1]:.4f}"
+        )
+        print(
+            f"Loss at max val_precision: {results[val_precision.index(max(val_precision))].val_loss:.4f}"
+        )
+        plt.plot(val_precision, label="val_precision")
+        plt.plot(val_recall, label="val_recall")
         plt.legend()
         plt.show()
 
@@ -70,10 +75,10 @@ class TrainingMetrics:
         average_ndcg = [result.average_ndcg for result in results]
         print(f"Max average_ndcg: {max(average_ndcg):.4f}")
         print(f"End average_ndcg: {average_ndcg[-1]:.4f}")
-        plt.plot(average_ndcg, label='average_ndcg')
+        plt.plot(average_ndcg, label="average_ndcg")
         plt.legend()
-        plt.xlabel('Epoch')
-        plt.ylabel('NDCG')
+        plt.xlabel("Epoch")
+        plt.ylabel("NDCG")
         plt.show()
 
     @staticmethod
@@ -81,9 +86,9 @@ class TrainingMetrics:
         f1 = [result.average_f1 for result in results]
         print(f"Max f1: {max(f1):.4f}")
         print(f"End f1: {f1[-1]:.4f}")
-        plt.plot(f1, label='f1')
-        plt.xlabel('Epoch')
-        plt.ylabel('F1 Score')
+        plt.plot(f1, label="f1")
+        plt.xlabel("Epoch")
+        plt.ylabel("F1 Score")
         plt.legend()
         plt.show()
 
@@ -92,9 +97,9 @@ class TrainingMetrics:
         f1 = [result.val_average_f1 for result in results]
         print(f"Max f1: {max(f1):.4f}")
         print(f"End f1: {f1[-1]:.4f}")
-        plt.plot(f1, label='f1')
-        plt.xlabel('Epoch')
-        plt.ylabel('F1 Score')
+        plt.plot(f1, label="f1")
+        plt.xlabel("Epoch")
+        plt.ylabel("F1 Score")
         plt.legend()
         plt.show()
 
@@ -103,9 +108,9 @@ class TrainingMetrics:
         val_loss = [result.val_loss for result in results]
         print(f"Min val_loss: {min(val_loss):.4f}")
         print(f"End val_loss: {val_loss[-1]:.4f}")
-        plt.plot(val_loss, label='val_loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
+        plt.plot(val_loss, label="val_loss")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
         plt.legend()
         plt.show()
 
@@ -114,9 +119,9 @@ class TrainingMetrics:
         val_ndcg = [result.val_average_ndcg for result in results]
         print(f"Max val_ndcg: {max(val_ndcg):.4f}")
         print(f"End val_ndcg: {val_ndcg[-1]:.4f}")
-        plt.plot(val_ndcg, label='val_ndcg')
-        plt.xlabel('Epoch')
-        plt.ylabel('NDCG')
+        plt.plot(val_ndcg, label="val_ndcg")
+        plt.xlabel("Epoch")
+        plt.ylabel("NDCG")
         plt.legend()
         plt.show()
 
@@ -126,10 +131,10 @@ class TrainingMetrics:
         val_loss = [result.val_loss.detach().numpy() for result in results]
         print(f"Min val_loss: {min(val_loss):.4f}")
         print(f"End val_loss: {val_loss[-1]:.4f}")
-        plt.plot(train_loss, label='train_loss')
-        plt.plot(val_loss, label='val_loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
+        plt.plot(train_loss, label="train_loss")
+        plt.plot(val_loss, label="val_loss")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
         plt.legend()
         plt.show()
 
@@ -149,7 +154,9 @@ class ShallowAutoencoder(nn.Module):
     number of rows usually 100 templates
     """
 
-    def __init__(self, n: int, d: int, device: str = None, layer_norm=False, dropout_p=0.1):
+    def __init__(
+        self, n: int, d: int, device: str = None, layer_norm=False, dropout_p=0.1
+    ):
         super().__init__()
         self.E = nn.Parameter(torch.empty(n, d))
         self.D = nn.Parameter(torch.empty(n, d))
@@ -170,11 +177,11 @@ class ShallowAutoencoder(nn.Module):
         #
         self.register_buffer("x_min", torch.tensor(0.0))
         self.register_buffer("x_max", torch.tensor(0.0))
-        if device != 'cpu':
-            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        if device != "cpu":
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
             self.device = "cpu"
         else:
-            self.device = 'cpu'
+            self.device = "cpu"
 
         self.training_metrics = []
 
@@ -211,16 +218,16 @@ class ShallowAutoencoder(nn.Module):
         return torch.sigmoid(out)
 
     def fit(
-            self,
-            train: Dataset | torch.Tensor,
-            epochs=10,
-            lr=1e-3,
-            batch_size=1024,
-            weight_decay=1e-4,
-            positive_weight=5.0,
-            label_smoothing=0.0,
-            val: Dataset | torch.Tensor = None,
-            full_training: bool = False
+        self,
+        train: Dataset | torch.Tensor,
+        epochs=10,
+        lr=1e-3,
+        batch_size=1024,
+        weight_decay=1e-4,
+        positive_weight=5.0,
+        label_smoothing=0.0,
+        val: Dataset | torch.Tensor = None,
+        full_training: bool = False,
     ):
         """
         Trains the model on the given dataset X and calculates validation IoU if a validation set is provided.
@@ -244,12 +251,12 @@ class ShallowAutoencoder(nn.Module):
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
         # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=6e-5)
 
-        criterion = nn.BCELoss(reduction='none')
+        criterion = nn.BCELoss(reduction="none")
         for epoch in range(epochs):
             self.train()
             train_loss = 0.0
             training_ndcg = 0.0
-            for (training_batch, learning_batch, validation_batch) in train_loader:
+            for training_batch, learning_batch, validation_batch in train_loader:
                 if full_training:
                     batch_data = learning_batch
                     target_data = validation_batch
@@ -262,7 +269,8 @@ class ShallowAutoencoder(nn.Module):
                 reconstruction = self.forward(batch_data)
 
                 target = (
-                    target_data * (1 - label_smoothing) + (1 - target_data) * label_smoothing
+                    target_data * (1 - label_smoothing)
+                    + (1 - target_data) * label_smoothing
                     if label_smoothing > 0
                     else batch_data
                 )
@@ -284,7 +292,9 @@ class ShallowAutoencoder(nn.Module):
                 optimizer.step()
 
                 with torch.no_grad():
-                    ndcg_batch = compute_batch_ndcg(batch_data, target_data, reconstruction, k=1000)
+                    ndcg_batch = compute_batch_ndcg(
+                        batch_data, target_data, reconstruction, k=1000
+                    )
                     training_ndcg += ndcg_batch * batch_data.size(0)
 
                 train_loss += loss.mean() * batch_data.size(0)
@@ -300,21 +310,38 @@ class ShallowAutoencoder(nn.Module):
                 f1_scores = []
                 num_batches = 0
                 with torch.no_grad():
-                    for (batch_data, _, val_data) in train_loader:
+                    for batch_data, _, val_data in train_loader:
                         # NDCG
-                        batch_data, val_data = batch_data.to(self.device), val_data.to(self.device)
+                        batch_data, val_data = batch_data.to(self.device), val_data.to(
+                            self.device
+                        )
                         reconstruction = self.forward(batch_data)
-                        ndcg_batch = compute_batch_ndcg(batch_data, val_data, reconstruction, k=1000)
+                        ndcg_batch = compute_batch_ndcg(
+                            batch_data, val_data, reconstruction, k=1000
+                        )
                         total_ndcg += ndcg_batch * batch_data.size(0)
                         total_items += batch_data.size(0)
                         num_batches += 1
                         # Compute F1 using scikit-learn
-                        f1 = compute_batch_f1(batch_data, val_data, reconstruction, threshold=0.5)
+                        f1 = compute_batch_f1(
+                            batch_data, val_data, reconstruction, threshold=0.5
+                        )
                         f1_scores.append(f1)
 
                 average_ndcg = total_ndcg / total_items if total_items > 0 else 0.0
                 average_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0.0
-                evaluation_metrics = TrainingMetrics(avg_train_loss, avg_train_ndcg, average_ndcg, average_f1, None, None, None, None, None, None)
+                evaluation_metrics = TrainingMetrics(
+                    avg_train_loss,
+                    avg_train_ndcg,
+                    average_ndcg,
+                    average_f1,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
                 self.training_metrics.append(evaluation_metrics)
 
             # Validation 2 - NDCG on validation set
@@ -326,7 +353,7 @@ class ShallowAutoencoder(nn.Module):
                 val_f1_scores = []
                 val_iou_scores = []
                 with torch.no_grad():
-                    for (batch_data_val, _, val_data_val) in val_loader:
+                    for batch_data_val, _, val_data_val in val_loader:
                         batch_data_val = batch_data_val.to(self.device)
                         val_data_val = val_data_val.to(self.device)
 
@@ -335,16 +362,25 @@ class ShallowAutoencoder(nn.Module):
 
                         # Validation loss (weighted, similar to training)
                         loss_val = criterion(reconstruction_val, val_data_val)
-                        weights_val = torch.where(val_data_val > 0.5, positive_weight, 1.0)
+                        weights_val = torch.where(
+                            val_data_val > 0.5, positive_weight, 1.0
+                        )
                         weighted_loss_val = (loss_val * weights_val).mean()
                         val_loss += weighted_loss_val * batch_data_val.size(0)
 
                         # NDCG
-                        ndcg_val_batch = compute_batch_ndcg(batch_data_val, val_data_val, reconstruction_val, k=1000)
+                        ndcg_val_batch = compute_batch_ndcg(
+                            batch_data_val, val_data_val, reconstruction_val, k=1000
+                        )
                         val_total_ndcg += ndcg_val_batch * batch_data_val.size(0)
 
                         # F1
-                        f1_val_batch = compute_batch_f1(batch_data_val, val_data_val, reconstruction_val, threshold=0.5)
+                        f1_val_batch = compute_batch_f1(
+                            batch_data_val,
+                            val_data_val,
+                            reconstruction_val,
+                            threshold=0.5,
+                        )
                         val_f1_scores.append(f1_val_batch)
 
                         # IoU (Jaccard Index)
@@ -352,16 +388,26 @@ class ShallowAutoencoder(nn.Module):
                         pred_mask_val = (reconstruction_val >= 0.5).float()
                         true_mask_val = (val_data_val >= 0.5).float()
                         intersection = (pred_mask_val * true_mask_val).sum()
-                        union = (pred_mask_val + true_mask_val - pred_mask_val * true_mask_val).sum()
+                        union = (
+                            pred_mask_val
+                            + true_mask_val
+                            - pred_mask_val * true_mask_val
+                        ).sum()
                         iou_val_batch = intersection / (union + 1e-7)
                         val_iou_scores.append(iou_val_batch.item())
 
                         val_total_items += batch_data_val.size(0)
 
                 average_val_loss = val_loss / len(val_loader.dataset)
-                average_val_ndcg = val_total_ndcg / val_total_items if val_total_items > 0 else 0.0
-                average_val_f1 = sum(val_f1_scores) / len(val_f1_scores) if val_f1_scores else 0.0
-                average_val_iou = sum(val_iou_scores) / len(val_iou_scores) if val_iou_scores else 0.0
+                average_val_ndcg = (
+                    val_total_ndcg / val_total_items if val_total_items > 0 else 0.0
+                )
+                average_val_f1 = (
+                    sum(val_f1_scores) / len(val_f1_scores) if val_f1_scores else 0.0
+                )
+                average_val_iou = (
+                    sum(val_iou_scores) / len(val_iou_scores) if val_iou_scores else 0.0
+                )
                 self.training_metrics[-1].val_loss = average_val_loss
                 self.training_metrics[-1].val_average_ndcg = average_val_ndcg
                 self.training_metrics[-1].val_average_f1 = average_val_f1
@@ -383,6 +429,7 @@ class ShallowAutoencoder(nn.Module):
             X = X.to(self.device)
             reconstruction = self.forward_for_user(X)
         return reconstruction
+
 
 def compute_batch_ndcg(batch_data, val_data, reconstruction, k=None):
     """
@@ -423,6 +470,7 @@ def compute_batch_ndcg(batch_data, val_data, reconstruction, k=None):
 
     ndcg = dcg / idcg if idcg > 0 else 0.0
     return ndcg
+
 
 def compute_batch_f1(batch_data, val_data, reconstruction, threshold=0.5):
     """

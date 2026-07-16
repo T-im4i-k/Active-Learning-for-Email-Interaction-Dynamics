@@ -1,29 +1,36 @@
+import csv
+import json
+import logging
+import os
 import random
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Self, Optional, Type
+from typing import Any, Dict, List, Optional, Self, Tuple, Type
+
 import numpy as np
 import pandas as pd
-import os
-import json
-from datetime import datetime
-import csv
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-import logging
+from torch.utils.data import DataLoader, Dataset
 
 from email_outreach.experiment_utils.experiment_constants import DDQN_FOLDER_NAME
-from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import AbstractContextualModel, AbstractConfig
-from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
-from email_outreach.ml.shallow_autoencoder.metrics.abstract_metrics import AbstractMetrics
+from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
+    AbstractConfig,
+    AbstractContextualModel,
+)
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
+    AutoencoderDataset,
+)
+from email_outreach.ml.shallow_autoencoder.metrics.abstract_metrics import (
+    AbstractMetrics,
+)
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
@@ -32,20 +39,33 @@ logger = logging.getLogger(__name__)
 class DDQNMetrics(AbstractMetrics):
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "mailshot_id": int(self.mailshot_id) if hasattr(self.mailshot_id, "item") else self.mailshot_id,
+            "mailshot_id": (
+                int(self.mailshot_id)
+                if hasattr(self.mailshot_id, "item")
+                else self.mailshot_id
+            ),
             "opened": bool(self.opened),
-            "prediction": float(self.prediction) if hasattr(self.prediction, "item") else self.prediction
+            "prediction": (
+                float(self.prediction)
+                if hasattr(self.prediction, "item")
+                else self.prediction
+            ),
         }
 
-
     @classmethod
-    def from_csv_gz(cls, folder: Path, filename: str = "results.csv.gz") -> List["DDQNMetrics"]:
+    def from_csv_gz(
+        cls, folder: Path, filename: str = "results.csv.gz"
+    ) -> List["DDQNMetrics"]:
         # Load the CSV file into a DataFrame
-        df = pd.read_csv(folder / filename, compression='gzip')
+        df = pd.read_csv(folder / filename, compression="gzip")
 
         # Convert each row to a DDQNMetrics object
         metrics_list = [
-            cls(mailshot_id=row["mailshot_id"], opened=row["opened"], prediction=row["prediction"])
+            cls(
+                mailshot_id=row["mailshot_id"],
+                opened=row["opened"],
+                prediction=row["prediction"],
+            )
             for _, row in df.iterrows()
         ]
 
@@ -58,11 +78,13 @@ class DDQNMetrics(AbstractMetrics):
         """
         metrics_list = []
         for _, row in df.iterrows():
-            metrics_list.append(cls(
-                mailshot_id=int(row["mailshot_id"]),
-                opened=bool(row["opened"]),
-                prediction=float(row["prediction"])
-            ))
+            metrics_list.append(
+                cls(
+                    mailshot_id=int(row["mailshot_id"]),
+                    opened=bool(row["opened"]),
+                    prediction=float(row["prediction"]),
+                )
+            )
         return metrics_list
 
 
@@ -72,7 +94,12 @@ class OfflineRLDataset(Dataset):
     Holds (s, a, r, s') transitions for offline RL.
     Expects each item in `transitions` to be (state, action, reward, next_state).
     """
-    def __init__(self, transitions: List[Tuple[np.ndarray, int, float, np.ndarray]], mailshot_ids: Optional[List[int]] = None) -> None:
+
+    def __init__(
+        self,
+        transitions: List[Tuple[np.ndarray, int, float, np.ndarray]],
+        mailshot_ids: Optional[List[int]] = None,
+    ) -> None:
         super().__init__()
         self.data = transitions
         # Store mailshot IDs if provided (for metrics collection)
@@ -88,7 +115,9 @@ class OfflineRLDataset(Dataset):
             "action": a,
             "reward": r,
             "next_state": s_next.astype(np.float32),
-            "mailshot_id": self.mailshot_ids[idx] if idx < len(self.mailshot_ids) else -1
+            "mailshot_id": (
+                self.mailshot_ids[idx] if idx < len(self.mailshot_ids) else -1
+            ),
         }
 
     @staticmethod
@@ -135,10 +164,10 @@ class OfflineRLDataset(Dataset):
                     mails_since_open += 1
 
             # Return a small DataFrame of computed columns, aligned to user_df's index
-            return pd.DataFrame({
-                "mails_since_last_open": mslo_list,
-                "total_opens_so_far": tosf_list
-            }, index=user_df.index)
+            return pd.DataFrame(
+                {"mails_since_last_open": mslo_list, "total_opens_so_far": tosf_list},
+                index=user_df.index,
+            )
 
         # Apply to each user separately, then rejoin
         stats_df = df.groupby("user_id", group_keys=False).apply(_compute_user_stats)
@@ -148,11 +177,11 @@ class OfflineRLDataset(Dataset):
 
     @staticmethod
     def _build_transitions(
-            df: pd.DataFrame,
-            user2idx: Dict[int, int],
-            mailshot2idx: Dict[int, int],
-            numeric_cols: List[str],
-            unknown_mailshot_idx: int
+        df: pd.DataFrame,
+        user2idx: Dict[int, int],
+        mailshot2idx: Dict[int, int],
+        numeric_cols: List[str],
+        unknown_mailshot_idx: int,
     ) -> Tuple[List[Tuple[np.ndarray, int, float, np.ndarray]], List[int]]:
         """
         Builds (state , action , reward , next_state) tuples.
@@ -180,11 +209,14 @@ class OfflineRLDataset(Dataset):
         numeric_array = df[numeric_cols].values.astype(np.float32)
 
         # 3) build CURRENT-STATE array                                        #
-        states_array = np.concatenate([
-            df["user_idx"].values.reshape(-1, 1).astype(np.float32),
-            df["mail_idx"].values.reshape(-1, 1).astype(np.float32),
-            numeric_array
-        ], axis=1)
+        states_array = np.concatenate(
+            [
+                df["user_idx"].values.reshape(-1, 1).astype(np.float32),
+                df["mail_idx"].values.reshape(-1, 1).astype(np.float32),
+                numeric_array,
+            ],
+            axis=1,
+        )
 
         # 4) build NEXT-STATE columns by *shifting inside each user*          #
         # shift(-1) gives the values of the next row within the same user;
@@ -208,32 +240,32 @@ class OfflineRLDataset(Dataset):
 
         # After the fill all columns are numeric → convert to ndarray
         next_numeric_cols = [f"next_{c}" for c in numeric_cols]
-        next_states_array = np.concatenate([
-            df["next_user_idx"].values.reshape(-1, 1).astype(np.float32),
-            df["next_mail_idx"].values.reshape(-1, 1).astype(np.float32),
-            df[next_numeric_cols].values.astype(np.float32)
-        ], axis=1)
+        next_states_array = np.concatenate(
+            [
+                df["next_user_idx"].values.reshape(-1, 1).astype(np.float32),
+                df["next_mail_idx"].values.reshape(-1, 1).astype(np.float32),
+                df[next_numeric_cols].values.astype(np.float32),
+            ],
+            axis=1,
+        )
 
         # 6) action / reward                                                 #
         rewards = (df["opened"] == 1).astype(np.float32).values
         actions = np.ones(len(df), dtype=np.int32)  # always SEND=1
 
         # 7) pack everything together                                         #
-        transitions = list(zip(
-            states_array,
-            actions,
-            rewards,
-            next_states_array
-        ))
+        transitions = list(zip(states_array, actions, rewards, next_states_array))
 
         mailshot_ids = df["mailshot_id"].tolist()
         return transitions, mailshot_ids
 
     @classmethod
-    def from_autoencoder_datasets(cls, train: AutoencoderDataset, val: AutoencoderDataset) -> Tuple[Self, Self, int, int]:
+    def from_autoencoder_datasets(
+        cls, train: AutoencoderDataset, val: AutoencoderDataset
+    ) -> Tuple[Self, Self, int, int]:
         num_val_mailshots = len(val.mailshot_ids)
         num_train_mailshots = len(train.mailshot_ids)
-        val.mails['mailshot_id'] += num_train_mailshots
+        val.mails["mailshot_id"] += num_train_mailshots
         df = pd.concat([train.mails, val.mails], axis=0)
         df = df[["user_id", "mailshot_id", "time_to_open", "opened"]].copy()
         df = cls.augment_df_with_open_stats(df)
@@ -259,23 +291,32 @@ class OfflineRLDataset(Dataset):
 
         # Build transitions
         numeric_cols = ["total_opens_so_far", "mails_since_last_open"]
-        train_transitions, train_mailshot_ids = cls._build_transitions(df_train, user2idx, mailshot2idx, numeric_cols, UNKNOWN_MAILSHOT_IDX)
-        val_transitions, val_mailshot_ids = cls._build_transitions(df_val, user2idx, mailshot2idx, numeric_cols, UNKNOWN_MAILSHOT_IDX)
+        train_transitions, train_mailshot_ids = cls._build_transitions(
+            df_train, user2idx, mailshot2idx, numeric_cols, UNKNOWN_MAILSHOT_IDX
+        )
+        val_transitions, val_mailshot_ids = cls._build_transitions(
+            df_val, user2idx, mailshot2idx, numeric_cols, UNKNOWN_MAILSHOT_IDX
+        )
 
-        return cls(train_transitions, train_mailshot_ids), cls(val_transitions, val_mailshot_ids), len(train_mailshots), len(train_users)
+        return (
+            cls(train_transitions, train_mailshot_ids),
+            cls(val_transitions, val_mailshot_ids),
+            len(train_mailshots),
+            len(train_users),
+        )
 
 
 # 2) QNetwork: a feed-forward net for Q(s,a) with embeddings
 class EmbeddingQNetwork(nn.Module):
     def __init__(
-            self,
-            num_users: int,
-            user_emb_dim: int,
-            num_mailshots: int,
-            mailshot_emb_dim: int,
-            hidden_dim: int = 128,
-            action_dim: int = 2,
-            numerical_dim: int = 2,
+        self,
+        num_users: int,
+        user_emb_dim: int,
+        num_mailshots: int,
+        mailshot_emb_dim: int,
+        hidden_dim: int = 128,
+        action_dim: int = 2,
+        numerical_dim: int = 2,
     ):
         super().__init__()
         self.user_emb = nn.Embedding(num_users, user_emb_dim)
@@ -287,7 +328,7 @@ class EmbeddingQNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim)
+            nn.Linear(hidden_dim, action_dim),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -345,7 +386,7 @@ class DoubleDQNConfig(AbstractConfig):
         if not config_path.exists():
             raise FileNotFoundError(f"Configuration file {config_path} does not exist.")
 
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             config_dict = json.load(f)
 
         return cls(**config_dict)
@@ -366,13 +407,15 @@ class DoubleDQNTrainer(AbstractContextualModel):
         self.loss_fn = nn.MSELoss()
         self.global_step = 0
         self.unknown_mailshot_idx = -1
-        
+
         # Create timestamp-based run ID and results directory
-        self.run_id = datetime.now().strftime("%Y%m%d-%H%M%S")  # Format: 20250514-104420
+        self.run_id = datetime.now().strftime(
+            "%Y%m%d-%H%M%S"
+        )  # Format: 20250514-104420
         self.results_dir = os.path.join(os.getcwd(), "results", self.run_id)
         os.makedirs(self.results_dir, exist_ok=True)
         logger.info(f"Results will be saved to: {self.results_dir}")
-        
+
         # Create metrics subdirectory within the results directory
         self.metrics_dir = os.path.join(self.results_dir, "metrics")
         os.makedirs(self.metrics_dir, exist_ok=True)
@@ -410,14 +453,16 @@ class DoubleDQNTrainer(AbstractContextualModel):
     def fit(self, train: AutoencoderDataset, val: AutoencoderDataset) -> None:
         self._train = train
         self._val = val
-        self._train_rl_dataset, self._val_rl_dataset, num_mailshots, num_users = OfflineRLDataset.from_autoencoder_datasets(train, val)
+        self._train_rl_dataset, self._val_rl_dataset, num_mailshots, num_users = (
+            OfflineRLDataset.from_autoencoder_datasets(train, val)
+        )
         self.unknown_mailshot_idx = num_mailshots  # keep for later use
         num_mailshots += 1  # add one for the unknown mailshot
         seed = self.config.seed
-        
+
         # Save config to the result's directory
         config_path = os.path.join(self.results_dir, "config.json")
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             json.dump(self.config.to_dict(), f, indent=2)
         logger.info(f"Config saved to {config_path}")
 
@@ -441,7 +486,9 @@ class DoubleDQNTrainer(AbstractContextualModel):
             action_dim=2,
             numerical_dim=2,
         ).to(self.device)
-        self._optimizer = optim.AdamW(self.q_net.parameters(), lr=self.config.lr, weight_decay=self.config.wd)
+        self._optimizer = optim.AdamW(
+            self.q_net.parameters(), lr=self.config.lr, weight_decay=self.config.wd
+        )
         self.target_net.load_state_dict(self.q_net.state_dict())
 
         random.seed(seed)
@@ -453,7 +500,9 @@ class DoubleDQNTrainer(AbstractContextualModel):
         dataset = self._train_rl_dataset
         val_dataset = self._val_rl_dataset
         logger.info(f"Batch size: {self.config.batch_size}")
-        dataloader = DataLoader(dataset, batch_size=self.config.batch_size, shuffle=True)
+        dataloader = DataLoader(
+            dataset, batch_size=self.config.batch_size, shuffle=True
+        )
 
         for epoch in range(self.config.epochs):
             logger.info(f"Epoch {epoch+1}")
@@ -464,13 +513,13 @@ class DoubleDQNTrainer(AbstractContextualModel):
             for i, batch in enumerate(dataloader):
                 if i % 100 == 0:
                     logger.info(f"Batch {i}/{len(dataloader)}")
-                states = batch["state"].to(self.device)   # shape [B, 2]
+                states = batch["state"].to(self.device)  # shape [B, 2]
                 actions = batch["action"].long().to(self.device)
                 rewards = batch["reward"].float().to(self.device)
                 next_states = batch["next_state"].to(self.device)
                 dones = torch.tensor(
                     (batch["next_state"][:, 1] == self.unknown_mailshot_idx).float(),
-                    device=self.device
+                    device=self.device,
                 )
 
                 # Q(s,a)
@@ -482,10 +531,14 @@ class DoubleDQNTrainer(AbstractContextualModel):
                     next_actions = q_next_online.argmax(dim=1)
 
                     q_next_target = self.target_net(next_states)
-                    q_next_target_chosen = q_next_target.gather(1, next_actions.unsqueeze(-1)).squeeze(-1)
+                    q_next_target_chosen = q_next_target.gather(
+                        1, next_actions.unsqueeze(-1)
+                    ).squeeze(-1)
 
                     # If gamma=0 => q_target = reward
-                    q_target = rewards + (1.0 - dones) * self.gamma * q_next_target_chosen
+                    q_target = (
+                        rewards + (1.0 - dones) * self.gamma * q_next_target_chosen
+                    )
 
                 loss = self.loss_fn(q_values_chosen, q_target)
                 self.optimizer.zero_grad()
@@ -504,39 +557,44 @@ class DoubleDQNTrainer(AbstractContextualModel):
             logger.info(f"Calculating validation loss...")
             val_loss = None
             if val_dataset is not None and len(val_dataset) > 0:
-                val_loss = self.compute_validation_loss(val_dataset, batch_size=self.config.batch_size)
+                val_loss = self.compute_validation_loss(
+                    val_dataset, batch_size=self.config.batch_size
+                )
 
                 # Collect validation metrics
-                metrics = self.collect_validation_metrics(val_dataset, batch_size=self.config.batch_size)
+                metrics = self.collect_validation_metrics(
+                    val_dataset, batch_size=self.config.batch_size
+                )
                 self.save_metrics_to_file(metrics, epoch)
-                
+
                 # Save model checkpoint every 5 epochs
                 if (epoch + 1) % 5 == 0:
                     self.save_model(epoch)
 
             if val_loss is not None:
-                logger.info(f"[Epoch {epoch+1}/{self.config.epochs}] TrainLoss={avg_loss:.4f} | ValLoss={val_loss:.4f}")
+                logger.info(
+                    f"[Epoch {epoch+1}/{self.config.epochs}] TrainLoss={avg_loss:.4f} | ValLoss={val_loss:.4f}"
+                )
             else:
-                logger.info(f"[Epoch {epoch+1}/{self.config.epochs}] TrainLoss={avg_loss:.4f}")
+                logger.info(
+                    f"[Epoch {epoch+1}/{self.config.epochs}] TrainLoss={avg_loss:.4f}"
+                )
 
             # ---- RECALL@k% every 'recall_eval_freq' epochs ----
-            if val_dataset is not None and (epoch+1) % 1 == 0:
+            if val_dataset is not None and (epoch + 1) % 1 == 0:
                 recall_dict = compute_recall_at_k_percent_list(
                     q_net=self.q_net,
                     validation_data=val_dataset,
                     top_fractions=self.config.recall_fractions,
-                    device=self.device
+                    device=self.device,
                 )
                 recall_str = ", ".join(
-                    f"Recall@{int(f*100)}%={rec:.3f}"
-                    for f, rec in recall_dict.items()
+                    f"Recall@{int(f*100)}%={rec:.3f}" for f, rec in recall_dict.items()
                 )
                 logger.info(f"   >> {recall_str}")
 
     def collect_validation_metrics(
-        self,
-        val_dataset: OfflineRLDataset,
-        batch_size: int = 1024
+        self, val_dataset: OfflineRLDataset, batch_size: int = 1024
     ) -> List[DDQNMetrics]:
         """
         Collects validation metrics for each sample in the validation dataset.
@@ -550,22 +608,30 @@ class DoubleDQNTrainer(AbstractContextualModel):
         with torch.no_grad():
             for batch in val_loader:
                 states = batch["state"].to(self.device)
-                rewards = batch["reward"].float().to(self.device)  # 1.0 if opened else 0.0
-                mailshot_ids = batch.get("mailshot_id", [-1] * len(states))  # Default to -1 if not present
+                rewards = (
+                    batch["reward"].float().to(self.device)
+                )  # 1.0 if opened else 0.0
+                mailshot_ids = batch.get(
+                    "mailshot_id", [-1] * len(states)
+                )  # Default to -1 if not present
 
                 q_values = self.q_net(states)
-                send_scores = q_values[:, 1].cpu().numpy()  # Get Q(s, action=1) for SEND action
+                send_scores = (
+                    q_values[:, 1].cpu().numpy()
+                )  # Get Q(s, action=1) for SEND action
 
                 # Convert rewards to boolean opened status
                 opened_status = rewards.cpu().numpy() > 0.5
 
                 # Create a DDQNMetrics object for each sample and add to list
                 for i in range(len(states)):
-                    metrics_list.append(DDQNMetrics(
-                        mailshot_id=int(mailshot_ids[i]),
-                        opened=bool(opened_status[i]),
-                        prediction=float(send_scores[i])
-                    ))
+                    metrics_list.append(
+                        DDQNMetrics(
+                            mailshot_id=int(mailshot_ids[i]),
+                            opened=bool(opened_status[i]),
+                            prediction=float(send_scores[i]),
+                        )
+                    )
 
         logger.info(f"Collected {len(metrics_list)} validation metrics")
         return metrics_list
@@ -576,25 +642,31 @@ class DoubleDQNTrainer(AbstractContextualModel):
         Returns the path to the saved file.
         """
         # Create a filename with an epoch number
-        metrics_file = os.path.join(self.metrics_dir, f"validation_metrics_epoch{epoch}.csv")
+        metrics_file = os.path.join(
+            self.metrics_dir, f"validation_metrics_epoch{epoch}.csv"
+        )
 
         # Write metrics to CSV
-        with open(metrics_file, 'w', newline='') as csvfile:
-            fieldnames = ['mailshot_id', 'opened', 'prediction', 'epoch']
+        with open(metrics_file, "w", newline="") as csvfile:
+            fieldnames = ["mailshot_id", "opened", "prediction", "epoch"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            
+
             writer.writeheader()
             for m in metrics:
-                writer.writerow({
-                    'mailshot_id': m.mailshot_id,
-                    'opened': int(m.opened),  # Convert bool to int (1/0) for easier analysis
-                    'prediction': m.prediction,
-                    'epoch': epoch
-                })
+                writer.writerow(
+                    {
+                        "mailshot_id": m.mailshot_id,
+                        "opened": int(
+                            m.opened
+                        ),  # Convert bool to int (1/0) for easier analysis
+                        "prediction": m.prediction,
+                        "epoch": epoch,
+                    }
+                )
 
         logger.info(f"Saved {len(metrics)} validation metrics to {metrics_file}")
         return metrics_file
-    
+
     def save_model(self, epoch: Optional[int] = None) -> str:
         """
         Saves the Q-network model to the results directory.
@@ -603,28 +675,31 @@ class DoubleDQNTrainer(AbstractContextualModel):
         """
         filename = f"q_network_model{'_epoch'+str(epoch) if epoch is not None else '_final'}.pt"
         model_path = os.path.join(self.results_dir, filename)
-        
-        torch.save({
-            'model_state_dict': self.q_net.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'epoch': epoch if epoch is not None else self.config.epochs,
-            'global_step': self.global_step,
-        }, model_path)
-        
+
+        torch.save(
+            {
+                "model_state_dict": self.q_net.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "epoch": epoch if epoch is not None else self.config.epochs,
+                "global_step": self.global_step,
+            },
+            model_path,
+        )
+
         logger.info(f"Model saved to {model_path}")
         return model_path
 
     def predict(self, data: AutoencoderDataset) -> List[DDQNMetrics]:
         # data are expected to be the same as the validation set
         if self.val.shape == data.shape:
-            return self.collect_validation_metrics(self._val_rl_dataset, batch_size=self.config.batch_size)
+            return self.collect_validation_metrics(
+                self._val_rl_dataset, batch_size=self.config.batch_size
+            )
         else:
             raise NotImplementedError
 
     def compute_validation_loss(
-        self,
-        val_dataset: OfflineRLDataset,
-        batch_size: int = 1024
+        self, val_dataset: OfflineRLDataset, batch_size: int = 1024
     ) -> float:
         """
         Computes the Double DQN loss on the validation set (no gradient update).
@@ -651,9 +726,15 @@ class DoubleDQNTrainer(AbstractContextualModel):
                 next_actions = q_next_online.argmax(dim=1)
 
                 q_next_target = self.target_net(next_states)
-                q_next_target_chosen = q_next_target.gather(1, next_actions.unsqueeze(-1)).squeeze(-1)
+                q_next_target_chosen = q_next_target.gather(
+                    1, next_actions.unsqueeze(-1)
+                ).squeeze(-1)
 
-                dones = (batch["next_state"][:, 1] == self.unknown_mailshot_idx).float().to(self.device)
+                dones = (
+                    (batch["next_state"][:, 1] == self.unknown_mailshot_idx)
+                    .float()
+                    .to(self.device)
+                )
 
                 q_target = rewards + (1.0 - dones) * self.gamma * q_next_target_chosen
 
@@ -666,19 +747,19 @@ class DoubleDQNTrainer(AbstractContextualModel):
 
 # 4) Evaluation: Accuracy & Recall@k%
 def compute_accuracy(
-        q_net: nn.Module,
-        validation_dataset: OfflineRLDataset,
-        device: str = "cpu"
+    q_net: nn.Module, validation_dataset: OfflineRLDataset, device: str = "cpu"
 ) -> float:
     q_net.eval()
     correct = 0
     total = 0
 
     with torch.no_grad():
-        for (state, _, opened, _) in validation_dataset.data:
+        for state, _, opened, _ in validation_dataset.data:
             gt_action = 1 if opened > 0 else 0
 
-            s_tensor = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            s_tensor = torch.tensor(
+                state, dtype=torch.float32, device=device
+            ).unsqueeze(0)
             q_values = q_net(s_tensor)
             pred_action = q_values.argmax(dim=1).item()
 
@@ -694,7 +775,7 @@ def compute_recall_at_k_percent_list(
     validation_data: OfflineRLDataset,
     top_fractions: List[float],
     batch_size: int = 8192,
-    device: str = "cpu"
+    device: str = "cpu",
 ) -> Dict[float, float]:
     """
     Vectorized version of recall@k%:
@@ -709,7 +790,7 @@ def compute_recall_at_k_percent_list(
     logger.info("Gathering states and opened labels...")
     states_list = []
     opened_list = []
-    for (state, _, opened, _) in validation_data.data:
+    for state, _, opened, _ in validation_data.data:
         states_list.append(state)
         opened_list.append(int(opened > 0))
 
@@ -728,12 +809,10 @@ def compute_recall_at_k_percent_list(
         while idx_start < N:
             idx_end = min(idx_start + batch_size, N)
             batch_states = torch.tensor(
-                states_array[idx_start:idx_end],
-                dtype=torch.float32,
-                device=device
+                states_array[idx_start:idx_end], dtype=torch.float32, device=device
             )
-            q_values = q_net(batch_states)        # [B, action_dim]
-            q_send = q_values[:, 1].cpu().numpy() # Q(s, action=1)
+            q_values = q_net(batch_states)  # [B, action_dim]
+            q_send = q_values[:, 1].cpu().numpy()  # Q(s, action=1)
             scores[idx_start:idx_end] = q_send
             idx_start = idx_end
 
@@ -742,7 +821,9 @@ def compute_recall_at_k_percent_list(
     combined = combined[combined[:, 0].argsort()[::-1]]
 
     # 4) Prefix the sum of positives
-    prefix_positives = np.cumsum(combined[:,1])  # shape [N]; prefix_positives[i] = # of opens up to i-th sorted item
+    prefix_positives = np.cumsum(
+        combined[:, 1]
+    )  # shape [N]; prefix_positives[i] = # of opens up to i-th sorted item
 
     # 5) Compute recall
     results = {}
@@ -752,7 +833,7 @@ def compute_recall_at_k_percent_list(
             results[f] = 0.0
         else:
             # number of positives in top K => prefix_positives[K-1]
-            positives_in_top_K = prefix_positives[K-1]
+            positives_in_top_K = prefix_positives[K - 1]
             recall = positives_in_top_K / total_positives
             results[f] = float(recall)
 
@@ -763,11 +844,15 @@ def compute_recall_at_k_percent_list(
 if __name__ == "__main__":
     sender_id = ...
     logger.info(f"Loading dataset for sender_id {sender_id}...")
-    datasets = AutoencoderDataset.from_disk_data_split(sender_id, split_sizes=[5, 10], remove_users_below_n_opens=1)
+    datasets = AutoencoderDataset.from_disk_data_split(
+        sender_id, split_sizes=[5, 10], remove_users_below_n_opens=1
+    )
     train = datasets[0]
     val = datasets[1]
     test = datasets[2]
-    logger.info(f"Dataset loaded. Train size: {len(train.mails)}, Val size: {len(val.mails)}, Test size: {len(test.mails)}")
+    logger.info(
+        f"Dataset loaded. Train size: {len(train.mails)}, Val size: {len(val.mails)}, Test size: {len(test.mails)}"
+    )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     config = DoubleDQNConfig(
@@ -781,7 +866,7 @@ if __name__ == "__main__":
         wd=1e-5,
         gamma=0.95,
         device=device,
-        target_update_freq=2000
+        target_update_freq=2000,
     )
     ddqn_trainer = DoubleDQNTrainer(config=config)
 
@@ -791,16 +876,21 @@ if __name__ == "__main__":
     logger.info(f"Training completed.")
 
     # Evaluate final performance
-    acc_val = compute_accuracy(ddqn_trainer.q_net, ddqn_trainer._val_rl_dataset, device=device)
+    acc_val = compute_accuracy(
+        ddqn_trainer.q_net, ddqn_trainer._val_rl_dataset, device=device
+    )
     logger.info(f"Validation Accuracy: {acc_val:.3f}")
-    
+
     # Save final model and accuracy
     ddqn_trainer.save_model()
-    with open(os.path.join(ddqn_trainer.results_dir, "final_metrics.json"), 'w') as f:
-        json.dump({
-            "validation_accuracy": acc_val,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }, f, indent=2)
-    
-    logger.info(f"All results saved to: {ddqn_trainer.results_dir}")
+    with open(os.path.join(ddqn_trainer.results_dir, "final_metrics.json"), "w") as f:
+        json.dump(
+            {
+                "validation_accuracy": acc_val,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            },
+            f,
+            indent=2,
+        )
 
+    logger.info(f"All results saved to: {ddqn_trainer.results_dir}")

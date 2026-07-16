@@ -11,7 +11,9 @@ from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
     AbstractConfig,
     AbstractContextualModel,
 )
-from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
+    AutoencoderDataset,
+)
 from email_outreach.ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,7 @@ class RandomConfig(AbstractConfig):
 
     @classmethod
     def from_filename(cls, filename: str) -> Self:
-        stem = Path(filename).stem          # strips extension
+        stem = Path(filename).stem  # strips extension
         seed = int(stem.split("=")[1])
         return cls(seed=seed)
 
@@ -44,6 +46,7 @@ class RandomModel(AbstractContextualModel):
     """
     A very simple baseline:  every (user, mailshot) interaction receives a score sampled uniformly from U(0, 1).
     """
+
     def __init__(self, config: RandomConfig):
         super().__init__(config)
         self.config = config
@@ -66,9 +69,9 @@ class RandomModel(AbstractContextualModel):
 
         for mailshot_id in range(len(data)):
             # Boolean ground-truth tensor for the current mailshot.
-            opened_tensor = torch.tensor(
-                data._mailshot_embeddings[mailshot_id]
-            )[data.mailshot_user_indices(mailshot_id)]
+            opened_tensor = torch.tensor(data._mailshot_embeddings[mailshot_id])[
+                data.mailshot_user_indices(mailshot_id)
+            ]
 
             for opened in opened_tensor:
                 random_score = random.random()  # uniform in [0, 1)
