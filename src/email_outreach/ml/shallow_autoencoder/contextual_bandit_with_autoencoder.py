@@ -10,11 +10,14 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
-from experiment_utils.experiment_constants import CONTEXTUAL_BANDIT_FOLDER_NAME
-from ml.shallow_autoencoder.abstract_contextual_model import AbstractContextualModel, ContextualBanditMetrics, \
-    AbstractConfig
-from ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
-from ml.shallow_autoencoder.model.autoencoder_chunked import ShallowAutoencoder, TrainingMetrics
+from email_outreach.experiment_utils.experiment_constants import CONTEXTUAL_BANDIT_FOLDER_NAME
+from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
+    AbstractConfig,
+    AbstractContextualModel,
+    ContextualBanditMetrics,
+)
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import ShallowAutoencoder, TrainingMetrics
 
 logger = logging.getLogger(__name__)
 

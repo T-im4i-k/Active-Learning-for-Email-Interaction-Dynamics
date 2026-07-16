@@ -8,16 +8,21 @@ import json
 import logging
 from typing import Dict, Any
 
-from ml.baselines.fmfcdb import FMFCDBModel
-from ml.baselines.fmpsal import FMPSALModel
-from ml.baselines.model_based_rl import ModelBasedRL
-from ml.baselines.fmrsal import FMRSALModel
-from ml.baselines.random_model import RandomModel
-from ml.baselines.ddqn_linkedin import DoubleDQNTrainer
-from ml.baselines.factor_ucb import FactorUCBModel
-from ml.baselines.thompson_sampling import ThompsonSamplingModel
-from ml.shallow_autoencoder.contextual_bandit_with_autoencoder import ContextualBanditWithAutoencoder
-from experiment_utils.experiment_constants import get_experiment_folder_path, GRID_SEARCH_FILE_NAME
+from email_outreach.experiment_utils.experiment_constants import (
+    GRID_SEARCH_FILE_NAME,
+    get_experiment_folder_path,
+)
+from email_outreach.ml.baselines.ddqn_linkedin import DoubleDQNTrainer
+from email_outreach.ml.baselines.factor_ucb import FactorUCBModel
+from email_outreach.ml.baselines.fmfcdb import FMFCDBModel
+from email_outreach.ml.baselines.fmpsal import FMPSALModel
+from email_outreach.ml.baselines.fmrsal import FMRSALModel
+from email_outreach.ml.baselines.model_based_rl import ModelBasedRL
+from email_outreach.ml.baselines.random_model import RandomModel
+from email_outreach.ml.baselines.thompson_sampling import ThompsonSamplingModel
+from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
+    ContextualBanditWithAutoencoder,
+)
 
 
 logging.basicConfig(

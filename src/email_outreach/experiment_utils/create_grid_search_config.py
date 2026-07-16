@@ -10,8 +10,11 @@ import json
 import logging
 from typing import Dict, Any
 
-from experiment_utils.experiment_constants import get_experiment_folder_path, GRID_SEARCH_FILE_NAME, \
-    generate_timestamp_version
+from email_outreach.experiment_utils.experiment_constants import (
+    GRID_SEARCH_FILE_NAME,
+    generate_timestamp_version,
+    get_experiment_folder_path,
+)
 
 logging.basicConfig(
     format="%(asctime)s : %(levelname)s : %(name)s : %(message)s",

@@ -7,9 +7,9 @@ from implicit.als import AlternatingLeastSquares
 from scipy.special import expit as sigmoid
 from sklearn.linear_model import LogisticRegression
 
-from ml.shallow_autoencoder.abstract_contextual_model import AbstractContextualModel, AbstractConfig
-from ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
-from ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
+from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import AbstractContextualModel, AbstractConfig
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
 
 logger = logging.getLogger(__name__)
 

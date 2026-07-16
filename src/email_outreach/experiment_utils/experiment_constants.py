@@ -1,7 +1,7 @@
 import datetime
 from pathlib import Path
 
-from utils.constants import ROOT_FOLDER
+from email_outreach.utils.constants import ROOT_FOLDER
 
 EXPERIMENTS_FOLDER = ROOT_FOLDER / "experiments"
 TEST_SET_FOLDER = EXPERIMENTS_FOLDER / "test_set"

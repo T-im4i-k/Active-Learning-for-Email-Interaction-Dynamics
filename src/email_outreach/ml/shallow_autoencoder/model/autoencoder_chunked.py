@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset, TensorDataset
 import torch.nn.init as init
 
-from utils.common_utils import set_seed
+from email_outreach.utils.common_utils import set_seed
 
 # References:
 # - Sedhain S. et al., "AutoRec: Autoencoders Meet Collaborative Filtering," WWW 2015.

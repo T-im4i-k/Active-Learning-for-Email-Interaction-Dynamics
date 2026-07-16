@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Self, TypeVar
 
 import pandas as pd
 
-from ml.shallow_autoencoder.metrics.abstract_metrics import AbstractMetrics
+from email_outreach.ml.shallow_autoencoder.metrics.abstract_metrics import AbstractMetrics
 
 TMetrics = TypeVar("TMetrics", bound="AbstractMetrics")
 

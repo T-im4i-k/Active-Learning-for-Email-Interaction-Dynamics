@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from utils.data_loader_utils import load_data_for_sender
+from email_outreach.utils.data_loader_utils import load_data_for_sender
 
 logger = logging.getLogger(__name__)
 

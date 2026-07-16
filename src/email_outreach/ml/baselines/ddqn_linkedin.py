@@ -15,10 +15,10 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import logging
 
-from experiment_utils.experiment_constants import DDQN_FOLDER_NAME
-from ml.shallow_autoencoder.abstract_contextual_model import AbstractContextualModel, AbstractConfig
-from ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
-from ml.shallow_autoencoder.metrics.abstract_metrics import AbstractMetrics
+from email_outreach.experiment_utils.experiment_constants import DDQN_FOLDER_NAME
+from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import AbstractContextualModel, AbstractConfig
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.metrics.abstract_metrics import AbstractMetrics
 
 logging.basicConfig(
     level=logging.INFO,

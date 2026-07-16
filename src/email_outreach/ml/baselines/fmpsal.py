@@ -10,10 +10,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from ml.shallow_autoencoder.abstract_contextual_model import \
+from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import \
         AbstractConfig, AbstractContextualModel
-from ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
-from ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
 
 logger = logging.getLogger(__name__)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

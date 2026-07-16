@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from utils.constants import ROOT_FOLDER
+from email_outreach.utils.constants import ROOT_FOLDER
 
 import pandas as pd
 

@@ -14,10 +14,14 @@ import numpy as np
 from sklearn.model_selection import ParameterSampler
 from joblib import Parallel, delayed
 
-from experiment_utils.experiment_constants import EXPERIMENT_RESULTS_FOLDER_NAME, get_test_folder_path, get_experiment_folder_path
-from ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
-from ml.shallow_autoencoder.metrics.abstract_metrics import AbstractMetrics
-from ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
+from email_outreach.experiment_utils.experiment_constants import (
+    EXPERIMENT_RESULTS_FOLDER_NAME,
+    get_experiment_folder_path,
+    get_test_folder_path,
+)
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import AutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.metrics.abstract_metrics import AbstractMetrics
+from email_outreach.ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
 
 TConfig = TypeVar("TConfig", bound="AbstractConfig")
 logger = logging.getLogger(__name__)

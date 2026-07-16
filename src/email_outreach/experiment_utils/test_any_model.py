@@ -4,16 +4,16 @@ from pathlib import Path
 import argparse
 import logging
 
-from ml.baselines.fmpsal import FMPSALModel
-from ml.baselines.factor_ucb import FactorUCBModel
-from ml.baselines.fmfcdb import FMFCDBModel
-from ml.baselines.random_model import RandomModel
-from ml.baselines.ddqn_linkedin import DoubleDQNTrainer
-from ml.baselines.thompson_sampling import ThompsonSamplingModel
-from ml.baselines.fmrsal import FMRSALModel
-from ml.baselines.model_based_rl import ModelBasedRL
-from experiment_utils.experiment_constants import EXPERIMENT_RESULTS_FOLDER_NAME
-from ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
+from email_outreach.experiment_utils.experiment_constants import EXPERIMENT_RESULTS_FOLDER_NAME
+from email_outreach.ml.baselines.ddqn_linkedin import DoubleDQNTrainer
+from email_outreach.ml.baselines.factor_ucb import FactorUCBModel
+from email_outreach.ml.baselines.fmfcdb import FMFCDBModel
+from email_outreach.ml.baselines.fmpsal import FMPSALModel
+from email_outreach.ml.baselines.fmrsal import FMRSALModel
+from email_outreach.ml.baselines.model_based_rl import ModelBasedRL
+from email_outreach.ml.baselines.random_model import RandomModel
+from email_outreach.ml.baselines.thompson_sampling import ThompsonSamplingModel
+from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
     ContextualBanditWithAutoencoder
 )
 
