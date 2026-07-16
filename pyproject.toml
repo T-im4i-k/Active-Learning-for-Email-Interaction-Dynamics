@@ -3,11 +3,12 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "email-outreach-dynamics"
+name = "email-outreach"
 version = "0.1.0"
 description = "Active recommendation and contextual bandit experiments for email outreach dynamics"
 readme = "README.md"
 requires-python = ">=3.12"
+
 dependencies = [
 	"torch",
 	"torchmetrics",
@@ -20,6 +21,14 @@ dependencies = [
 	"matplotlib",
 	"implicit",
 	"pyarrow",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pylint",
+    "black",
+    "mypy",
+    "isort",
 ]
 
 [project.scripts]
