@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "email-outreach-dynamics"
+version = "0.1.0"
+description = "Active recommendation and contextual bandit experiments for email outreach dynamics"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+	"torch",
+	"torchmetrics",
+	"numpy",
+	"pandas",
+	"scikit-learn",
+	"scipy",
+	"joblib",
+	"psycopg",
+	"matplotlib",
+	"implicit",
+	"pyarrow",
+]
+
+[project.scripts]
+grid-search = "email_outreach.experiment_utils.run_grid_search:main"
+test-any-model = "email_outreach.experiment_utils.test_any_model:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
