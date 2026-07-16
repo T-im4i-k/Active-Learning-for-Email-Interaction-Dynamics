@@ -1,11 +1,12 @@
 import logging
 from pathlib import Path
+from utils.constants import ROOT_FOLDER
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-DATA_FOLDER = Path('data') / 'subsets'
+DATA_FOLDER = ROOT_FOLDER / Path('data') / 'subsets'
 
 def file_name_for_sender(sender_id: int) -> str:
     return f'sender_mails_{sender_id}.parquet'
