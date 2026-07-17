@@ -32,8 +32,8 @@ dev = [
 ]
 
 [project.scripts]
-grid-search = "email_outreach.experiment_utils.run_grid_search:main"
-test-any-model = "email_outreach.experiment_utils.test_any_model:main"
+grid-search = "email_outreach.cli_grid_search:main"
+test-any-model = "email_outreach.cli_test:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
