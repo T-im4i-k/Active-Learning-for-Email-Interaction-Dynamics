@@ -44,7 +44,7 @@ class FMFCDBConfig(AbstractConfig):
             "batch_size": self.batch_size,
             "n_epochs": self.n_epochs,
             "sample_rate": self.sample_rate,
-            "num_batches": self.num_batches,
+            "batches": self.num_batches,
             "observation_hours": self.observation_hours,
             "active_learning_weight": self.active_learning_weight,
             "early_exploration_boost": self.early_exploration_boost,

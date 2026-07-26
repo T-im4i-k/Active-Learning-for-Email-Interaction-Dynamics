@@ -75,7 +75,7 @@ class ContextualBanditMetrics(AbstractMetrics):
         """Convert various truthy / falsy representations to bool."""
         if isinstance(value, bool):
             return value
-        return str(value).strip().lower() in ("1", "true", "t", "yes", "y")
+        return str(value).strip().lower() in ("1", "true", "batch", "yes", "y")
 
     @staticmethod
     def _to_int_or_none(value: str | None) -> Optional[int]:
@@ -138,12 +138,12 @@ class ContextualBanditMetrics(AbstractMetrics):
 
     @classmethod
     def from_lists(
-        cls,
-        mailshot_id: int,
-        present_in_prediction: List[bool],
-        opened: List[bool],
-        prediction: List[float],
-        user_clusters: List[int],
+            cls,
+            mailshot_id: int,
+            present_in_prediction: List[bool],
+            opened: List[bool],
+            prediction: List[float],
+            user_clusters: List[int],
     ) -> List[Self]:
         return [
             cls(mailshot_id, o, pred, p, cluster)
@@ -226,7 +226,7 @@ class AbstractContextualModel(ABC):
 
     @classmethod
     def test(
-        cls, sender_id: int, split_sizes: List[int], repetitions: int, version: str
+            cls, sender_id: int, split_sizes: List[int], repetitions: int, version: str
     ) -> None:
         if len(split_sizes) != 1:
             raise ValueError("Only one split size is allowed for this experiment.")
@@ -255,7 +255,7 @@ class AbstractContextualModel(ABC):
 
                 # Create a folder for the current split size and repetition
                 current_folder = experiments_folder / (
-                    EXPERIMENT_RESULTS_FOLDER_NAME + f"_{i + 1}_{repetition}"
+                        EXPERIMENT_RESULTS_FOLDER_NAME + f"_{i + 1}_{repetition}"
                 )
                 current_folder.mkdir(parents=True, exist_ok=True)
                 logger.info(f"Current folder: {current_folder}. Saving results...")
@@ -265,17 +265,17 @@ class AbstractContextualModel(ABC):
 
     @classmethod
     def grid_search(
-        cls,
-        sender_id: int,
-        split_sizes: List[int],
-        version: str,
-        param_grid: Dict[str, List[Any]],
-        n_samples: Optional[int] = None,
-        n_jobs: int = 8,
-        scoring_function: Optional[
-            Callable[[List[ContextualBanditMetrics]], float]
-        ] = None,
-        random_state: int = 42,
+            cls,
+            sender_id: int,
+            split_sizes: List[int],
+            version: str,
+            param_grid: Dict[str, List[Any]],
+            n_samples: Optional[int] = None,
+            n_jobs: int = 8,
+            scoring_function: Optional[
+                Callable[[List[ContextualBanditMetrics]], float]
+            ] = None,
+            random_state: int = 42,
     ) -> None:
         """
         Perform grid search over hyperparameters for the model.
@@ -297,7 +297,12 @@ class AbstractContextualModel(ABC):
         results_folder = get_experiment_folder_path(
             sender_id, cls.model_name(), version
         )
+        test_folder = get_test_folder_path(
+            sender_id=sender_id, model_name=cls.model_name(), version=version
+        )
+
         results_folder.mkdir(parents=True, exist_ok=True)
+        test_folder.mkdir(parents=True, exist_ok=True)
 
         # Load datasets
         logger.info(f"Loading dataset for sender_id {sender_id}...")
@@ -345,20 +350,20 @@ class AbstractContextualModel(ABC):
 
         # Define default scoring function if none provided
         if scoring_function is None:
-
             def default_scoring(metrics: List[ContextualBanditMetrics]) -> float:
-                _, recalls, _ = cls.calculate_recall_precision_at_quantiles(metrics)
-                if len(recalls) >= 4:
-                    return (
-                        0.40 * recalls[0]
-                        + 0.30 * recalls[1]
-                        + 0.20 * recalls[2]
-                        + 0.10 * recalls[3]
-                    )
-                elif len(recalls) > 0:
-                    return np.mean(recalls)
-                else:
-                    return 0.0
+                _, recalls, _ = cls.calculate_recall_precision_at_quantiles(metrics, quantiles=[0.75])
+                return recalls[0]
+                # if len(recalls) >= 4:
+                #     return (
+                #         0.40 * recalls[0]
+                #         + 0.30 * recalls[1]
+                #         + 0.20 * recalls[2]
+                #         + 0.10 * recalls[3]
+                #     )
+                # elif len(recalls) > 0:
+                #     return np.mean(recalls)
+                # else:
+                #     return 0.0
 
             scoring_function = default_scoring
 
@@ -374,17 +379,17 @@ class AbstractContextualModel(ABC):
         logger.info(f"Grid search completed in {elapsed_time:.1f} seconds")
 
         # Process and save results
-        cls._save_grid_search_results(results, results_folder, elapsed_time)
+        cls._save_grid_search_results(results, results_folder, test_folder, elapsed_time)
 
     @classmethod
     def _run_single_experiment(
-        cls,
-        cfg_dict: Dict[str, Any],
-        exp_number: int,
-        train: AutoencoderDataset,
-        val: AutoencoderDataset,
-        results_folder: Path,
-        scoring_function: Callable[[List[ContextualBanditMetrics]], float],
+            cls,
+            cfg_dict: Dict[str, Any],
+            exp_number: int,
+            train: AutoencoderDataset,
+            val: AutoencoderDataset,
+            results_folder: Path,
+            scoring_function: Callable[[List[ContextualBanditMetrics]], float],
     ) -> Dict[str, Any]:
         """
         Run a single experiment with a given configuration.
@@ -397,66 +402,47 @@ class AbstractContextualModel(ABC):
         exp_folder = results_folder / f"exp_{exp_number}"
         exp_folder.mkdir(exist_ok=True, parents=True)
 
-        try:
-            # Save configuration
-            with open(exp_folder / "config.json", "w") as f:
-                json.dump(cfg_dict, f, indent=4)
+        with open(exp_folder / "config.json", "w") as f:
+            json.dump(cfg_dict, f, indent=4)
 
-            # Create config object and model
-            config = cls.config_class()(**cfg_dict)
-            model = cls(config=config)
+        # Create config object and model
+        config = cls.config_class()(**cfg_dict)
+        model = cls(config=config)
 
-            # Train and predict
-            model.fit(train, val)
-            metrics = model.predict(val)
+        # Train and predict
+        model.fit(train, val)
+        metrics = model.predict(val)
 
-            # Save metrics to compressed CSV
-            cls.metrics_class().to_csv_gz(metrics, folder=exp_folder)
+        # Save metrics to compressed CSV
+        cls.metrics_class().to_csv_gz(metrics, folder=exp_folder)
 
-            # Calculate score
-            score = scoring_function(metrics)
+        # Calculate score
+        score = scoring_function(metrics)
 
-            # Calculate additional metrics
-            _, recalls, precisions = cls.calculate_recall_precision_at_quantiles(
-                metrics
-            )
+        # Calculate additional metrics
+        _, recalls, precisions = cls.calculate_recall_precision_at_quantiles(
+            metrics
+        )
 
-            # Save summary results
-            results_summary = {
-                "experiment_number": exp_number,
-                "score": float(score),
-                "recalls": [float(r) for r in recalls] if recalls else [],
-                "precisions": [float(p) for p in precisions] if precisions else [],
-                "config": cfg_dict,
-                "n_metrics": len(metrics),
-            }
+        # Save summary results
+        results_summary = {
+            "experiment_number": exp_number,
+            "score": float(score),
+            "recalls": [float(r) for r in recalls] if recalls else [],
+            "precisions": [float(p) for p in precisions] if precisions else [],
+            "config": cfg_dict,
+            "n_metrics": len(metrics),
+        }
 
-            with open(exp_folder / "results_summary.json", "w") as f:
-                json.dump(results_summary, f, indent=4)
+        with open(exp_folder / "results_summary.json", "w") as f:
+            json.dump(results_summary, f, indent=4)
 
-            logger.info(f"Experiment {exp_number} completed with score: {score:.4f}")
-            return results_summary
-
-        except Exception as e:
-            logger.error(f"Experiment {exp_number} failed: {str(e)}")
-            error_summary = {
-                "experiment_number": exp_number,
-                "score": 0.0,
-                "recalls": [],
-                "precisions": [],
-                "config": cfg_dict,
-                "error": str(e),
-                "n_metrics": 0,
-            }
-
-            with open(exp_folder / "error.json", "w") as f:
-                json.dump(error_summary, f, indent=4)
-
-            return error_summary
+        logger.info(f"Experiment {exp_number} completed with score: {score:.4f}")
+        return results_summary
 
     @classmethod
     def _save_grid_search_results(
-        cls, results: List[Dict[str, Any]], results_folder: Path, elapsed_time: float
+            cls, results: List[Dict[str, Any]], results_folder: Path, test_folder: Path, elapsed_time: float
     ) -> None:
         """
         Save aggregated grid search results.
@@ -505,6 +491,9 @@ class AbstractContextualModel(ABC):
         with open(results_folder / "grid_search_summary.json", "w") as f:
             json.dump(summary, f, indent=4)
 
+        with open(test_folder / "config.json", "w") as f:
+            json.dump(top_results[0]["config"], f, indent=4)
+
         # Log top results
         logger.info(f"\nTop {top_k} configurations:")
         for rank, result in enumerate(top_results, 1):
@@ -517,8 +506,8 @@ class AbstractContextualModel(ABC):
 
     @staticmethod
     def calculate_recall_precision_at_quantiles(
-        metrics: List[AbstractMetrics],
-        quantiles: Sequence[float] = (0.25, 0.5, 0.75, 0.85),
+            metrics: List[AbstractMetrics],
+            quantiles: Sequence[float] = (0.25, 0.5, 0.75, 0.85),
     ) -> Tuple[List[float], List[float], List[float]]:
 
         by_mailshot = defaultdict(list)

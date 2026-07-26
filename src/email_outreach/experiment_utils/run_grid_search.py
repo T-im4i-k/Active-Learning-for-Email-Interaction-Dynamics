@@ -105,7 +105,7 @@ def save_config_to_experiment_folder(
     """Save the configuration to the experiment folder as grid_search_config.json."""
     experiment_folder = get_experiment_folder_path(sender_id, model_name, version)
 
-    # Create the folder if it doesn't exist
+    # Create the folder if it doesn'batch exist
     experiment_folder.mkdir(parents=True, exist_ok=True)
 
     # Save config to the experiment folder

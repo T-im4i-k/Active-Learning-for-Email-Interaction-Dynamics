@@ -30,7 +30,7 @@ def save_config_to_experiment_folder(
     """Save the configuration to the experiment folder as grid_search_config.json."""
     experiment_folder = get_experiment_folder_path(sender_id, model_name, version)
 
-    # Create the folder if it doesn't exist
+    # Create the folder if it doesn'batch exist
     experiment_folder.mkdir(parents=True, exist_ok=True)
 
     # Save config to the experiment folder
@@ -120,7 +120,7 @@ def create_example_config(
             "batch_size": [1000],
             "sample_rate": [0.1, 0.5, 0.7, 1.0],
             "feature_dim": [4, 6],
-            "num_batches": [48],
+            "batches": [48],
             "observation_hours": [1.0],
             "active_learning_weight": [0.3],
             "early_exploration_boost": [2.0],
