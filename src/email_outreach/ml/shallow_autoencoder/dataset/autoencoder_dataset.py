@@ -10,6 +10,7 @@ from email_outreach.utils.data_loader_utils import load_data_for_sender
 
 logger = logging.getLogger(__name__)
 
+from email_outreach.ml.shallow_autoencoder.dataset.template_weight import AbstractTemplateWeight
 
 class AutoencoderDataset(Dataset):
     validation_size = 1
@@ -47,6 +48,11 @@ class AutoencoderDataset(Dataset):
         logger.info(
             f"Dataset created with {len(self)} mailshots and {self.num_users} users"
         )
+        self.min_template_id: int = self.mails["mailshot_id"].min()
+        self.max_template_id: int = self.mails["mailshot_id"].max()
+
+        print(f"=== min_id: {self.min_template_id} ===")
+        print(f"=== max_id: {self.max_template_id} ===")
 
     @property
     def num_users(self) -> int:
@@ -94,8 +100,20 @@ class AutoencoderDataset(Dataset):
     def mailshot_ids(self) -> List[int]:
         return sorted(self.mails["mailshot_id"].unique())
 
-    @property
-    def popularity_tensor(self) -> torch.Tensor:
+    def popularity_tensor(self, template_weight: AbstractTemplateWeight) -> torch.Tensor:
+        mails = self.mails.assign(
+            raw_weight=lambda df: df["mailshot_id"].map(template_weight),
+        )
+        mails = mails.assign(weighted_opened=mails["raw_weight"] * mails["opened"])
+
+        grouped = mails.groupby("user_id")
+        weighted_sum = grouped["weighted_opened"].sum()
+        weight_total = grouped["raw_weight"].sum()
+
+        popularity = (weighted_sum / weight_total).sort_index()
+        return torch.tensor(popularity.to_numpy(), dtype=torch.float64)
+
+    def popularity_legacy(self):
         opens = self.mails.groupby("user_id")["opened"].sum().sort_index()
         count = self.mails.groupby("user_id")["opened"].count().sort_index()
         return torch.tensor(opens / count)

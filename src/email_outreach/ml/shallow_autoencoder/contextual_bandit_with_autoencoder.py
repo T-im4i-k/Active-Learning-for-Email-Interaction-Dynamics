@@ -28,24 +28,28 @@ from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
 
 from email_outreach.ml.shallow_autoencoder.alpha_scheduler import AbstractAlphaScheduler, AlphaSchedulerFactory, \
     AlphaSchedulerArgs
+from email_outreach.ml.shallow_autoencoder.dataset.template_weight import AbstractTemplateWeight, TemplateWeightFactory
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ContextualBanditWithAutoencoderConfig(AbstractConfig):
-    d: int = 10
+    d: int = 16
     epochs: int = 30
-    lr: float = 5e-3
-    wd: float = 1e-5
+    lr: float = 0.01
+    wd: float = 0.0001
     batch_size: int = 16
-    positive_weight: float = 1.0
+    positive_weight: float = 100.0
     alpha_type: str = "constant"
-    alpha_params: dict[str, int] = field(default_factory=lambda: {"alpha": 0.3})
-    G: float = 100.0
+    alpha_params: dict[str, float] = field(default_factory=lambda: {"alpha": 0.1})
+    template_weight: str = "uniform"
+    template_weight_params: dict[str, float] = field(default_factory=lambda: {})
+    G: float = 10000.0
     layer_norm: bool = True
-    T: int = 12 * 60  # Time in minutes
-    num_splits: int = 6  # Number of splits -> K
+    naive_f: bool = True
+    T: int = 2880  # Time in minutes
+    num_splits: int = 24  # Number of splits -> K
     sent_by_T: float = 0.15  # Sent by T of all users
     sent_after_T: float = 0.1
     j: int = 0  # Repetition of the experiment
@@ -62,8 +66,11 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "positive_weight": self.positive_weight,
             "alpha_type": self.alpha_type,
             "alpha_params": self.alpha_params,
+            "template_weight": self.template_weight,
+            "template_weight_params": self.template_weight_params,
             "G": self.G,
             "layer_norm": self.layer_norm,
+            "naive_f": self.naive_f,
             "num_splits": self.num_splits,
             "T": self.T,
             "sent_by_T": self.sent_by_T,
@@ -90,6 +97,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.last_prenormalized_f: torch.Tensor = torch.zeros(0)
 
         self.alpha_scheduler: AbstractAlphaScheduler = AlphaSchedulerFactory.from_config(config.to_dict())
+        self._template_weight: AbstractTemplateWeight | None = None
 
         self.config = config
         self.calculated_metrics: List[ContextualBanditMetrics] = []
@@ -101,6 +109,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.fjs_predictions: List[np.array] = []
         self.sjs_predictions: List[np.array] = []
         self.user_mask: List[np.array] = []
+
+        self._popularity_tensor = None
 
     @classmethod
     def model_name(cls) -> str:
@@ -126,6 +136,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             val: AutoencoderDataset | torch.Tensor,
     ) -> None:
         super().fit(train, val)
+
+        weight_config = self.config.to_dict() | {"min_template_id": self.train.min_template_id, "max_template_id": self.train.max_template_id}
+        self._template_weight = TemplateWeightFactory.from_config(weight_config)
         self._autoencoder = ShallowAutoencoder(
             n=train.num_users,
             d=self.config.d,
@@ -255,7 +268,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             scheduler_args: AlphaSchedulerArgs
     ) -> torch.Tensor:
         # Calculate p, f, s
-        fs: torch.tensor = self.calculate_f(opened, newly_opened)
+        fs: torch.tensor = self.calculate_f(opened, newly_opened) if self.config.naive_f else self.non_naive_f(opened)
         if self.last_p.sum() == 0:
             ps: torch.tensor = self.calculate_p()
             self.last_p = ps
@@ -352,7 +365,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return metrics
 
     def calculate_popularity(self) -> torch.tensor:
-        return self.train.popularity_tensor
+        if not self._template_weight:
+            raise ValueError("No template weight")
+
+        if self._popularity_tensor is None:
+            self._popularity_tensor = self.train.popularity_tensor(self._template_weight)
+        return self._popularity_tensor
 
     def calculate_p(self) -> torch.tensor:
         # logger.info("Calculating p")
@@ -422,23 +440,17 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         self.last_prenormalized_f += f
         normalized_f = self.last_prenormalized_f / sum(results)
-        if self.graph_for_n_runs > 0 and self.show_plots:
-            plt.hist(normalized_f.detach().numpy().flatten(), bins=100, color="blue")
-            plt.title("Histogram of f")
-            # Show only values of true opens
-            true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(
-                self.current_mailshot
-            )
-            averages_of_trues = normalized_f[true_opens == 1]
-            plt.hist(
-                averages_of_trues.detach().numpy().flatten(), bins=100, color="orange"
-            )
-            self.graph_for_n_runs -= 1
-            plt.show()
         if self.config.flipped:
             return torch.ones(normalized_f.shape) - normalized_f
         else:
             return normalized_f
+
+    def non_naive_f(self, results: torch.Tensor) -> torch.Tensor:
+        current_f = self.autoencoder.predict(results)
+        if self.config.flipped:
+            return torch.ones(current_f.shape) - current_f
+        else:
+            return current_f
 
     def calculate_f_ff(
             self, results: torch.Tensor, newly_opened: Set[int]
