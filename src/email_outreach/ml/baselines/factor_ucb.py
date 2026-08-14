@@ -53,7 +53,7 @@ class FactorUCBConfig(AbstractConfig):
             latent_dim=int(parts["l"]),
             reg=float(parts["reg"]),
             epochs=int(parts["epochs"]),
-            alpha=float(parts["alpha"]),
+            alpha=float(parts["coef"]),
         )
 
     @classmethod
@@ -64,7 +64,7 @@ class FactorUCBConfig(AbstractConfig):
             latent_dim=data["latent_dim"],
             reg=data["reg"],
             epochs=data["epochs"],
-            alpha=data["alpha"],
+            alpha=data["coef"],
             # random_state=data["random_state"]
         )
 

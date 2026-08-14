@@ -131,7 +131,7 @@ def create_example_config(
             "latent_dim": [16, 32, 64],
             "reg": [0.001, 0.01, 0.1],
             "epochs": [10, 20, 30],
-            "alpha": [0.1, 0.5, 1.0],
+            "coef": [0.1, 0.5, 1.0],
             "alpha_conf": [20.0],
         }
 

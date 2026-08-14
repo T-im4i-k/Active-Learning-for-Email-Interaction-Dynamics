@@ -44,6 +44,7 @@ parser.add_argument(
 )
 parser.add_argument("--experiment_version", type=str, help="Experiment version")
 parser.add_argument("--model", type=str, default="contextual_bandit", help="Model name")
+parser.add_argument("--n_jobs", type=int, default=8, help="Number of parallel jobs")
 
 
 def main():
@@ -53,6 +54,7 @@ def main():
     experiment_version = args.experiment_version
     split_sizes = args.split_sizes
     model = args.model
+    n_jobs = args.n_jobs
     logger.info(f"Experiment version: {experiment_version} for model {model}")
 
     if model == "contextual_bandit":
@@ -81,6 +83,7 @@ def main():
         split_sizes=split_sizes,
         repetitions=repetitions,
         version=experiment_version,
+        n_jobs = n_jobs
     )
 
 

@@ -3,41 +3,42 @@ import itertools
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
-class AlphaSchedulerArgs:
+class CoefSchedulerArgs:
     batch: int
     open_frac: float
 
 
-class AbstractAlphaScheduler(ABC):
+class AbstractCoefScheduler(ABC):
     @abstractmethod
-    def __call__(self, args: AlphaSchedulerArgs) -> float:
+    def __call__(self, args: CoefSchedulerArgs) -> float:
         raise NotImplementedError
 
 
-class ConstantAlphaScheduler(AbstractAlphaScheduler):
-    def __init__(self, alpha: float) -> None:
-        if not 0.0 <= alpha <= 1.0:
-            raise ValueError("Argument alpha must be in range [0, 1]")
-        self.alpha: float = alpha
+class ConstantCoefScheduler(AbstractCoefScheduler):
+    def __init__(self, coef: float) -> None:
+        if not 0.0 <= coef <= 1.0:
+            raise ValueError("Argument coef must be in range [0, 1]")
+        self.coef: float = coef
 
-    def __call__(self, args: AlphaSchedulerArgs) -> float:
+    def __call__(self, args: CoefSchedulerArgs) -> float:
         if args.batch < 0:
             raise ValueError("Argument batch must be a non-negative integer")
-        return self.alpha
+        return self.coef
 
 
-class AdaptiveAlphaScheduler(AbstractAlphaScheduler):
+class AdaptiveCoefScheduler(AbstractCoefScheduler):
     def __init__(self, dumping: float):
         self.dumping: float = dumping
 
-    def __call__(self, args: AlphaSchedulerArgs) -> float:
+    def __call__(self, args: CoefSchedulerArgs) -> float:
         return self.dumping / (args.open_frac + self.dumping)
 
 
-class InterpolatingAlphaScheduler(AbstractAlphaScheduler, ABC):
+class InterpolatingCoefScheduler(AbstractCoefScheduler, ABC):
     def __init__(
             self, left_bound: float, right_bound: float, batch_sizes: Sequence[float]
     ) -> None:
@@ -70,40 +71,28 @@ class InterpolatingAlphaScheduler(AbstractAlphaScheduler, ABC):
         return self._cumulative_sizes[batch] / self._total_emails
 
 
-class GeometricAlphaScheduler(InterpolatingAlphaScheduler):
-    def __call__(self, args: AlphaSchedulerArgs) -> float:
+class GeometricCoefScheduler(InterpolatingCoefScheduler):
+    def __call__(self, args: CoefSchedulerArgs) -> float:
         ratio: float = self._ratio(args.batch)
         return self.left_bound ** (1 - ratio) * self.right_bound ** ratio
 
 
-class LinearAlphaScheduler(InterpolatingAlphaScheduler):
-    def __call__(self, args: AlphaSchedulerArgs) -> float:
+class LinearCoefScheduler(InterpolatingCoefScheduler):
+    def __call__(self, args: CoefSchedulerArgs) -> float:
         ratio: float = self._ratio(args.batch)
         return self.left_bound * (1 - ratio) + self.right_bound * ratio
 
 
-# class SigmoidAlphaScheduler(InterpolatingAlphaScheduler):
-#     def __init__(self, left_bound: float, right_bound: float, batches: int, slope_coef: float,
-#                  shift_coef: float) -> None:
-#         if slope_coef < 0:
-#             raise ValueError("Argument slope_coef must be in non-negative")
-#
-#         super().__init__(left_bound, right_bound, batches)
-#         self.slope_coef: float = slope_coef
-#         self.shift_coef: float = shift_coef
-#
-#     def __call__(self, batch: int) -> float:
-#         if not 0 <= batch <= self.batches:
-#             raise ValueError("Argument batch must be an integer in range [0, batches]")
-#
-#         ratio: float = batch / self.batches
-#         coef: float = expit(self.slope_coef * (ratio - self.shift_coef))
-#         return self.left_bound * (1 - coef) + self.right_bound * coef
-
-
-class AlphaSchedulerFactory:
+class AbstractSchedulerFactory(ABC):
     @classmethod
-    def from_config(cls, config: dict) -> AbstractAlphaScheduler:
+    @abstractmethod
+    def from_config(cls, config: dict) -> AbstractCoefScheduler | None:
+        raise NotImplementedError
+
+
+class AlphaSchedulerFactory(AbstractSchedulerFactory):
+    @classmethod
+    def from_config(cls, config: dict) -> AbstractCoefScheduler:
         scheduler_type: str = config["alpha_type"].lower()
         alpha_params: dict = config["alpha_params"]
 
@@ -112,31 +101,57 @@ class AlphaSchedulerFactory:
 
         match scheduler_type:
             case "constant":
-                return ConstantAlphaScheduler(alpha=alpha_params["alpha"])
+                return ConstantCoefScheduler(coef=alpha_params["alpha"])
             case "geometric":
-                return GeometricAlphaScheduler(
+                return GeometricCoefScheduler(
                     left_bound=alpha_params["left_bound"],
                     right_bound=alpha_params["right_bound"],
                     batch_sizes=batch_sizes
                 )
             case "linear":
-                return LinearAlphaScheduler(
+                return LinearCoefScheduler(
                     left_bound=alpha_params["left_bound"],
                     right_bound=alpha_params["right_bound"],
                     batch_sizes=batch_sizes
                 )
             case "adaptive":
-                return AdaptiveAlphaScheduler(
+                return AdaptiveCoefScheduler(
                     dumping=alpha_params["dumping"]
                 )
-            # case "sigmoid":
-            #     return SigmoidAlphaScheduler(
-            #         left_bound=alpha_params["left_bound"],
-            #         right_bound=alpha_params["right_bound"],
-            #         batches=config["num_splits"],
-            #         slope_coef=alpha_params["slope_coef"],
-            #         shift_coef=alpha_params["shift_coef"],
-            #     )
+            case _:
+                raise ValueError(f"Unknown scheduler type: {scheduler_type}")
 
+
+class BetaSchedulerFactory(AbstractSchedulerFactory):
+    @classmethod
+    def from_config(cls, config: dict) -> AbstractCoefScheduler | None:
+        if config["beta_type"] is None:
+            return None
+
+        scheduler_type: str = config["beta_type"].lower()
+        beta_params: dict = config["beta_params"]
+
+        normal_batch_size = config["sent_by_T"] / config["num_splits"]
+        batch_sizes: Sequence[float] = [normal_batch_size] * config["num_splits"] + [config["sent_after_T"]]
+
+        match scheduler_type:
+            case "constant":
+                return ConstantCoefScheduler(coef=beta_params["beta"])
+            case "geometric":
+                return GeometricCoefScheduler(
+                    left_bound=beta_params["left_bound"],
+                    right_bound=beta_params["right_bound"],
+                    batch_sizes=batch_sizes
+                )
+            case "linear":
+                return LinearCoefScheduler(
+                    left_bound=beta_params["left_bound"],
+                    right_bound=beta_params["right_bound"],
+                    batch_sizes=batch_sizes
+                )
+            case "adaptive":
+                return AdaptiveCoefScheduler(
+                    dumping=beta_params["dumping"]
+                )
             case _:
                 raise ValueError(f"Unknown scheduler type: {scheduler_type}")

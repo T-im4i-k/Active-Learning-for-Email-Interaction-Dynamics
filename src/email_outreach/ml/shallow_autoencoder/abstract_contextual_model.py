@@ -226,7 +226,7 @@ class AbstractContextualModel(ABC):
 
     @classmethod
     def test(
-            cls, sender_id: int, split_sizes: List[int], repetitions: int, version: str
+            cls, sender_id: int, split_sizes: List[int], repetitions: int, version: str, n_jobs
     ) -> None:
         if len(split_sizes) != 1:
             raise ValueError("Only one split size is allowed for this experiment.")
@@ -236,32 +236,48 @@ class AbstractContextualModel(ABC):
             sender_id=sender_id, model_name=cls.model_name(), version=version
         )
         config: AbstractConfig = cls.config_class().from_json_file(experiments_folder)
-        for repetition in range(repetitions):
-            for i, current_split_size in enumerate(range(split_size, 0, -1)):
-                logger.info(
-                    f"Experiment {i + 1}/{split_size} - Repetition {repetition + 1}/{repetitions}"
-                )
-                # Load datasets using the provided sender_id and split configuration
-                # Always have size 1 for the test set, the last split is not used
-                datasets = AutoencoderDataset.from_disk_data_split(
-                    sender_id,
-                    split_sizes=[1, current_split_size - 1],
-                    remove_users_below_n_opens=1,
-                )
-                train, test = datasets[0], datasets[1]
-                model = cls(config=config)
-                model.fit(train, test)
-                metrics: List[AbstractMetrics] = model.predict(test)
 
-                # Create a folder for the current split size and repetition
-                current_folder = experiments_folder / (
-                        EXPERIMENT_RESULTS_FOLDER_NAME + f"_{i + 1}_{repetition}"
-                )
-                current_folder.mkdir(parents=True, exist_ok=True)
-                logger.info(f"Current folder: {current_folder}. Saving results...")
-                # Save the prediction metrics
-                ContextualBanditMetrics.to_csv_gz(metrics, folder=current_folder)
-                config.to_json_file(folder=current_folder)
+        Parallel(n_jobs=n_jobs, verbose=10)(
+            delayed(cls._run_single_test)(
+                sender_id=sender_id,
+                repetitions=repetitions,
+                split_size=split_size,
+                experiments_folder=experiments_folder,
+                config=config,
+                repetition=repetition,
+                i=i,
+                current_split_size=current_split_size
+            )
+            for repetition in range(repetitions) for i, current_split_size in enumerate(range(split_size, 0, -1))
+        )
+
+    @classmethod
+    def _run_single_test(cls, sender_id, repetitions, split_size, experiments_folder, config, repetition, i,
+                         current_split_size):
+        logger.info(
+            f"Experiment {i + 1}/{split_size} - Repetition {repetition + 1}/{repetitions}"
+        )
+        # Load datasets using the provided sender_id and split configuration
+        # Always have size 1 for the test set, the last split is not used
+        datasets = AutoencoderDataset.from_disk_data_split(
+            sender_id,
+            split_sizes=[1, current_split_size - 1],
+            remove_users_below_n_opens=1,
+        )
+        train, test = datasets[0], datasets[1]
+        model = cls(config=config)
+        model.fit(train, test)
+        metrics: List[AbstractMetrics] = model.predict(test)
+
+        # Create a folder for the current split size and repetition
+        current_folder = experiments_folder / (
+                EXPERIMENT_RESULTS_FOLDER_NAME + f"_{i + 1}_{repetition}"
+        )
+        current_folder.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Current folder: {current_folder}. Saving results...")
+        # Save the prediction metrics
+        ContextualBanditMetrics.to_csv_gz(metrics, folder=current_folder)
+        config.to_json_file(folder=current_folder)
 
     @classmethod
     def grid_search(
@@ -348,30 +364,11 @@ class AbstractContextualModel(ABC):
         with open(results_folder / "grid_search_metadata.json", "w") as f:
             json.dump(metadata, f, indent=4)
 
-        # Define default scoring function if none provided
-        if scoring_function is None:
-            def default_scoring(metrics: List[ContextualBanditMetrics]) -> float:
-                _, recalls, _ = cls.calculate_recall_precision_at_quantiles(metrics, quantiles=[0.75])
-                return recalls[0]
-                # if len(recalls) >= 4:
-                #     return (
-                #         0.40 * recalls[0]
-                #         + 0.30 * recalls[1]
-                #         + 0.20 * recalls[2]
-                #         + 0.10 * recalls[3]
-                #     )
-                # elif len(recalls) > 0:
-                #     return np.mean(recalls)
-                # else:
-                #     return 0.0
-
-            scoring_function = default_scoring
-
         # Run a parallel grid search
         t0 = time.time()
         results = Parallel(n_jobs=n_jobs, verbose=10)(
             delayed(cls._run_single_experiment)(
-                cfg_dict, exp_number, train, val, results_folder, scoring_function
+                cfg_dict, exp_number, train, val, results_folder
             )
             for exp_number, cfg_dict in enumerate(grid)
         )
@@ -389,7 +386,6 @@ class AbstractContextualModel(ABC):
             train: AutoencoderDataset,
             val: AutoencoderDataset,
             results_folder: Path,
-            scoring_function: Callable[[List[ContextualBanditMetrics]], float],
     ) -> Dict[str, Any]:
         """
         Run a single experiment with a given configuration.
@@ -417,7 +413,7 @@ class AbstractContextualModel(ABC):
         cls.metrics_class().to_csv_gz(metrics, folder=exp_folder)
 
         # Calculate score
-        score = scoring_function(metrics)
+        score = AbstractContextualModel.calculate_partial_auc(metrics, k_min=0.0, k_max=1.0)
 
         # Calculate additional metrics
         _, recalls, precisions = cls.calculate_recall_precision_at_quantiles(
@@ -559,3 +555,65 @@ class AbstractContextualModel(ABC):
 
         sent_pct = (1.0 - q).tolist()
         return sent_pct, final_rec.tolist(), final_prec.tolist()
+
+    @staticmethod
+    def calculate_partial_auc(
+            metrics: List["AbstractMetrics"],
+            k_min: float = 0.0,
+            k_max: float = 1.0,
+    ) -> float:
+        if not (0.0 <= k_min < k_max <= 1.0):
+            raise ValueError(f"Require 0 <= k_min < k_max <= 1, got k_min={k_min}, k_max={k_max}")
+
+        by_mailshot = defaultdict(list)
+        for m in metrics:
+            if hasattr(m, "present_in_prediction") and not m.present_in_prediction:
+                continue
+            by_mailshot[m.mailshot_id].append(m)
+
+        weighted_area_sum = 0.0
+        weight_total = 0
+
+        for ms in by_mailshot.values():
+            n = len(ms)
+            if n == 0:
+                continue
+
+            y_true = np.fromiter((m.opened for m in ms), dtype=np.int8, count=n)
+            pos = int(y_true.sum())
+            if pos == 0:
+                continue
+
+            y_pred = np.fromiter(
+                ((m.prediction - m.stage) if hasattr(m, "stage") else m.prediction for m in ms),
+                dtype=np.float64,
+                count=n,
+            )
+
+            order = np.argsort(y_pred)[::-1]
+            cum_tp = np.cumsum(y_true[order], dtype=np.int64)
+            rect_values = cum_tp / pos
+
+            i_start = int(np.ceil(k_min * n))
+            i_end = int(np.floor(k_max * n))
+
+            if i_start > i_end:
+                area = (k_max - k_min) * rect_values[i_start - 1]
+            else:
+                area = float(np.sum(rect_values[i_start:i_end])) / n if i_end > i_start else 0.0
+                if i_start > 0:
+                    left_overlap = i_start / n - k_min
+                    if left_overlap > 0:
+                        area += left_overlap * rect_values[i_start - 1]
+                if i_end < n:
+                    right_overlap = k_max - i_end / n
+                    if right_overlap > 0:
+                        area += right_overlap * rect_values[i_end]
+
+            weighted_area_sum += area * n
+            weight_total += n
+
+        if weight_total == 0:
+            return 0.0
+
+        return weighted_area_sum / (weight_total * (k_max - k_min))
