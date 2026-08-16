@@ -284,8 +284,7 @@ influences of users who have opened an email, as well as the influence of users 
 As was noted in previous sections, it is desirable that $p_j$ represents a measure of information gain from sending an
 email to user $j$ in terms of gaining more information about other users, given that user $j$ opens their email.
 
-The only way this information can be utilized is a
-change in $f_j (t)$ scores of other users.
+The only way this information can be utilized is a change in $f_j (t)$ scores of other users.
 
 However, the current definition of
 $$p_j = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} \Sigma_{j,i}$$
@@ -299,12 +298,199 @@ rather maximal uncertainty reduction in $f_j (t)$ scores of other users. In othe
 they open their email, will lead to a maximal reduction in uncertainty of $f_j (t)$ scores of other users. This is
 consistent with the goal of maximizing information gain.
 
-Thus, we propose a refined definition of $p_j$ that rewards maximal separation of $f_j (t)$ scores of other users if user $j$ opens an email, which is a measure of uncertainty reduction in $f_j (t)$ scores of other users:
+Thus, we propose a refined definition of $p_j$ that rewards maximal separation of $f_j (t)$ scores of other users if
+user $j$ opens an email, which is a measure of uncertainty reduction in $f_j (t)$ scores of other users:
 
 $$
 p_j = \frac{4}{m-1}\sum_{i=1, i\ne j}^{m} (\Sigma_{j,i} - \bar\Sigma_{j:})^2
 $$
 
-where $\bar\Sigma_{j:} = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} \Sigma_{j,i}$ is the mean of values in $\Sigma_{j:}$ among all recipients except user $j$.
+where $\bar\Sigma_{j:} = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} \Sigma_{j,i}$ is the mean of values in $\Sigma_{j:}$ among
+all recipients except user $j$.
 
-Effectively, this is the variance of values in $\Sigma_{j:}$ among all recipients except user $j$, scaled to be in $[0,1]$ (the factor of 4 ensures that the maximum possible variance of a Bernoulli variable, which is 0.25, scales to 1).
+Effectively, this is the variance of values in $\Sigma_{j:}$ among all recipients except user $j$, scaled to be
+in $[0,1]$ (the factor of 4 ensures that the maximum possible variance of a Bernoulli variable, which is 0.25, scales to
+1).
+
+# Improved definition of s
+
+As was noted in previous sections, 2 terms of $s_j (t)$: $\phi_j p_j$ and $f_j (t)$ have 2 orthogonal interpretations:
+exploration vs exploitation and historic vs current data.
+
+The current definition of $s_j (t)$ as a linear combination of $\phi_j p_j$ and $f_j (t)$  is not consistent with those
+2 different views. For instance, it is not clear why should exploration be based solely on historic data, while
+exploitation is based solely on current data.
+
+Thus, we propose a refined definition of $s_j (t)$:
+
+$$
+s_j (t) = \pi_j (t) u_j (t)
+$$
+
+Where
+
+$$
+\pi_j (t) = \alpha (t)\phi_j + (1-\alpha (t))f_j (t)
+$$
+An estimate of the probability of user $j$ opening an email at time $t$, based on both historic and current data.
+
+$$
+u_j (t) = \beta (t)p_j + (1-\beta (t))1
+$$
+
+Utility of user $j$ opening an email, accounting for both exploration and exploitation. The term $1$ represents the
+direct utility of user $j$ opening an email, while $p_j$ measures indirect utility of user $j$ opening an email in terms
+of information gain about other users.
+
+With $\pi_j (t)$ and $u_j (t)$ defined as above, the refined score function can be expressed as:
+$$
+s_j (t) = \biggl (\alpha (t)\phi_j + [1-\alpha (t)]f_j (t)\biggr) \biggl (\beta (t)p_j + [1-\beta (t)]1\biggr)
+$$
+
+Note that the refined definition of $s_j (t)$ has 2 hyperparameters $\alpha (t)$ and $\beta (t)$, which can be scheduled
+independently, allowing for more flexibility in controlling the exploration vs exploitation trade-off and historic vs
+current data trade-off.
+
+> It makes sense to use confidence-based scheduling for $\alpha (t)$, as discussed in previous sections, while using
+> sent-mail-based scheduling for $\beta (t)$, as discussed in previous sections.
+
+A strong advantage of the refined definition of $s_j (t)$ is reusal of the primitives of the original definition
+of $s_j (t)$, which allows for plug-and-play reusal of the of the improvements and modifications proposed in previous
+sections.
+
+## Incorporating Time-to-Open (TTO)
+
+The autoencoder is currently trained purely on $X$, the binary open/no-open matrix. This discards a second signal we
+have available for every observed open: the time-to-open (TTO). Two recipients who both eventually open a template are
+treated identically by the SAE, whether one opened in five minutes or five days - even though, given the short
+operational window ($w$ between batches, $T$ overall), only fast opens are actually actionable for the active learning
+process. We explore how to fold TTO into training of the SAE (and, by extension, $\phi_j$), without touching the
+definitions of $s_j (t)$, $p_j$, or $f_j (t)$ themselves any further than necessary.
+
+### TTO matrix and decayed label
+
+We introduce $\Delta \in (\mathbb{R}_{\ge 0} \cup \{+\infty\})^{n,m}$, the matrix of observed TTOs, where $\Delta_{i,j}$
+is the time between sending and opening of template $i$ by recipient $j$. For recipients who did not open template $i$,
+we set $\Delta_{i,j} = +\infty$.
+
+Note that $\Delta$ is strictly more expressive than $X$, since $X_{i,j} = \mathbb{1}[\Delta_{i,j} < \infty]$ - i.e. $X$
+can be recovered from $\Delta$, but not vice versa.
+
+We define a decayed open label, exponential in $\Delta$ (consistent with the exponential form already used for template
+recency in the Template Weights section):
+
+$$Y_{i,j} = 2 ^ { (\frac{-\Delta_{i,j}}{h_\delta})}$$
+
+where $h_\delta \gt 0$ is a TTO half-life hyperparameter, and we adopt the convention $2 ^ {-\infty} = 0$, so that
+$Y_{i,j} = 0$ for recipients who did not open. For recipients who did open, $Y_{i,j} \in (0, 1]$, smoothly discounting
+slow opens rather than counting them identically to fast ones.
+
+> **Special case:** as $h_\delta \to \infty$, $Y_{i,j} \to X_{i,j}$ for every opener, recovering the original binary
+> model exactly - the same "special case" relationship used to justify the template weights generalization above. A
+> hard "cutoff" (treat any open slower than some threshold $\delta_c$ as a non-open) is the opposite limit,
+> $h_\delta \to 0$, which turns $Y$ into a step function of $\Delta$.
+
+
+> A hyperbolic form,
+> $Y_{i,j} = \kappa_\delta / (\Delta_{i,j} + \kappa_\delta)$, mirroring the Confidence Alpha Scheduling section, is a
+> reasonable alternative with a heavier tail than the exponential form above; both remain to be validated empirically
+> against each other.
+
+> This composes directly with the weighted $\phi_j$ from the Template Weights section, since the two decays (recency of
+> template, speed of open) are orthogonal:
+>
+> $$\phi_j = (\omega^T Y_{:j}) / \sum_{i=1}^{n} \omega_i$$
+
+We consider three ways of using $Y$ in place of $X$ when training the SAE, differing in whether the *input* to the
+autoencoder stays binary ($X$) or is replaced by the continuous $Y$.
+
+### Model A: $X \to Y$
+
+The simplest option keeps the SAE's input space unchanged (binary $x$), and only replaces the reconstruction target:
+
+$$\min_{E,D} l (Y, \sigma (X B_{E,D}))$$
+
+Since the input space is untouched, $e_j$ remains an entirely ordinary training-time input (a one-hot row is still
+exactly what a template with a single opener looks like), so $p_j$ carries over **mechanically unchanged**:
+
+$$p_j = \frac{1}{m-1}\sum_{i=1, i \ne j}^{m} \Sigma^{Y}_{j,i}, \quad \Sigma^Y = \sigma (B_{E,D})$$
+
+> **Interpretation shift:** $\Sigma^Y_{j,i}$ no longer represents a probability of $i$ opening given only $j$ opened -
+> it now represents a TTO-decayed, "speed-weighted" version of that quantity, blending *whether* $i$ would open with
+> *how fast*. This shift propagates to $p_j$ and $f_j (t)$ as well, and ultimately to $s_j (t)$.
+
+At inference, $f_j (t)$ can still be computed exactly as in the Improved Definition of f section (or a classic
+definition, it is also possible here), using the binary
+$x (t)$. Optionally, we can additionally exploit the TTO of recipients who have *already* opened template $n+1$ by time
+$t$, via the following extension.
+
+#### The $z (t)$ interpolation extension
+
+Define a continuous, partially TTO-informed state vector at decision time $t$:
+
+$$z_j (t) = \begin{cases} 2 ^ { (\frac{-\delta_j}{h_\delta})} & \text{recipient } j \text{ has opened by } t \\ 0 & \text{otherwise} \end{cases}$$
+
+where $\delta_j$ is the observed TTO of recipient $j$ for template $n+1$. We then define:
+
+$$f_j (t) = \sigma (z (t) ^ T B_{E,D}) e_j = f_{SAE} (z (t)) e_j$$
+
+> **Note on validity:** $x ^ T B_{E,D}$ is linear in $x$, and $z (t) \in [0,1]^m$ always, regardless of
+> whether $B_{E,D}$
+> was fit only on binary corners of the hypercube. The only nonlinearity in $f_{SAE}$ is the final sigmoid, which is
+> smooth and bounded everywhere. So evaluating $f_{SAE}$ at $z (t)$ is a mathematically tame extension of a model
+> trained on binary rows, not a leap into genuinely undefined territory - but whether it is empirically *useful*
+> (i.e. whether the TTO of early openers carries predictive signal the binary $x (t)$ does not) remains to be
+> validated.
+
+### Model B: $Y \to Y$
+
+A more expressive option lets the SAE also *see* TTO information on the input side:
+
+$$\min_{E,D} l (Y, \sigma (Y B_{E,D}))$$
+
+Here the input space becomes continuous, $Y_{i,j} \in [0,1)$.
+
+> This means $e_j$ - corresponding to $\delta_j = 0$, an
+> instantaneous open - is now a boundary point of the training distribution rather than a typical one, and querying
+> $\Sigma^Y_{j,:}$ at $e_j$ answers "if $j$ opened as fast as physically possible", not "if $j$ opened". We therefore
+> should **not** compute $p_j$ at $e_j$ under this model.
+
+#### $p_j$ under Model B
+
+We instead query $f_{SAE}$ at a point representative of the training distribution, scaled by a magnitude in the range
+the model actually saw during training. Two variants:
+
+**Recipient-scaled:**
+
+$$p_j = \frac{1}{m-1}\sum_{i=1, i \ne j}^{m} f_{SAE} (\bar Y_j \, e_j) e_i, \quad \bar Y_j = \frac{1}{n}\sum_{i=1}^{n} Y_{i,j}$$
+
+This asks "what if $j$ opens the way $j$ typically does" rather than "what if $j$ opens instantly" - a realistic
+expected effect rather than a best-case, counterfactual one.
+
+> **Note on coupling with $\phi_j$:** $\bar Y_j$ is, up to the choice of decay applied, the same quantity as $\phi_j$
+> (or its weighted generalization from the Template Weights section). This means $p_j$ now has recipient $j$'s own
+> activity level baked into the query magnitude, while $s_j (t)$ (and $\pi_j (t)$, in the refined definition above)
+> still multiplies by / combines with $\phi_j$ separately. The original design deliberately kept activity ($\phi_j$)
+> and magnitude-free influence ($p_j$) as independent, multiplicatively-combined axes; this recipient-scaled variant
+> partially collapses that separation and risks double-counting activity. Whether $\phi_j$ should still appear
+> separately in $s_j (t)$ / $\pi_j (t)$ under this variant is an open question, to be resolved empirically.
+
+**Population-mean (decoupled):**
+
+$$p_j = \frac{1}{m-1}\sum_{i=1, i \ne j}^{m} f_{SAE} (\bar Y \, e_j) e_i, \quad \bar Y = \frac{1}{nm}\sum_{k=1}^{n}\sum_{l=1}^{m} Y_{k,l}$$
+
+Querying at the *population* mean rather than recipient $j$'s own mean avoids the coupling above entirely, at the cost
+of asking a coarser question ("what if $j$ opens at a typical rate for *any* recipient" rather than "...for $j$
+specifically"). This preserves the original separation of concerns between $\phi_j$ and $p_j$ cleanly, and is the safer
+default of the two variants pending empirical comparison.
+
+$f_j (t)$ under Model B can reuse the same $z (t)$ construction as Model A; if anything, $z (t)$ is more in-distribution
+here, since the model was trained on continuous inputs rather than only binary ones.
+
+
+### Downstream considerations
+
+- **$G$ calibration.** $s_j (t)$ (or $\pi_j (t)$ in the refined definition) feeds $\alpha_j (t) = G s_j (t)$ and
+  $\beta_j (t) = G (1 - s_j (t))$. Regardless of how $s_j (t)$ is interpreted, this remains a Bernoulli-flavored
+  construction; moving to a TTO-blended $\Sigma^Y$ shifts the numeric range/distribution of $s_j (t)$, so $G$
+  (tuned against the original $X$-based $\Sigma$) likely needs re-tuning under any of Models A/B.
