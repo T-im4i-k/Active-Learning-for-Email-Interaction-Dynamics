@@ -516,6 +516,8 @@ For each experiment we report Recall-AUC, Recall@5%, Recall@15%, Recall@25% and 
 Recalls: [0.385 0.821 0.923 0.958] +- [0.076 0.028 0.014 0.011]
 AUC: 0.894 +- 0.012
 
+![Baseline Model](images/baseline_recalls_0_1.png)
+
 We reproduced original paper results with minimal diviations:
 
 Recalls@25% Recall@50% Recall@75%
@@ -533,6 +535,8 @@ Hyperparameters selected based of grid-search: $l = 0.1$, $r = 0.05$
 Recalls: [0.383 0.823 0.927 0.96 ] +- [0.073 0.023 0.012 0.01 ]
 AUC: 0.89 +- 0.213
 
+![Linear Alpha Scheduling](images/linear_alpha_recalls_0_1.png)
+
 
 #### Geomatric Alpha Scheduling
 
@@ -541,12 +545,16 @@ Hyperparameters selected based of grid-search: $l = 0.3$, $r = 0.05$
 Recalls: [0.377 0.823 0.927 0.959] +- [0.05  0.017 0.012 0.01 ]
 AUC: 0.894 +- 0.009
 
+![Geometric Alpha Scheduling](images/geometric_alpha_recalls_0_1.png)
+
 #### Confidence-Based Alpha Scheduling
 
 Hyperparameters selected based of grid-search: $\kappa = 0.003$
 
 Recalls: [0.341 0.818 0.926 0.96 ] +- [0.031 0.022 0.014 0.01 ]
 AUC: 0.887 +- 0.22
+
+![Confidence-Based Alpha Scheduling](images/confidence_based_alpha_recalls_0_1.png)
 
 ### Template Weights
 
@@ -555,12 +563,16 @@ Hyperparameters selected based of grid-search: $h = 0.3$
 Recalls: [0.447 0.837 0.928 0.96 ] +- [0.041 0.018 0.014 0.011]
 AUC: 0.899 +- 0.196
 
+![Template Weights](images/exp_template_weight_recalls_0_1.png)
+
 ### Forward-Pass f Definition
 
 Hyperparameters selected based of grid-search: -
 
 Recalls: [0.375 0.841 0.937 0.966] +- [0.049 0.029 0.018 0.01 ]
 AUC: 0.896 +- 0.207
+
+![Forward-Pass f Definition](images/forward_pass_f_recalls_0_1.png)
 
 ### Alternative s Definition
 
@@ -569,9 +581,13 @@ Hyperparameters selected based of grid-search: $\alpha (t)$ - confidence-based s
 Recalls: [0.425 0.821 0.922 0.959] +- [0.026 0.017 0.013 0.01 ]
 AUC: 0.895 +- 0.196
 
+![Alternative s Definition](images/alternative_s_recalls_0_1.png)
+
 ### Variance-Based p Definition
 
 Hyperparameters selected based of grid-search: -
 
 Recalls: [0.479 0.837 0.926 0.96 ] +- [0.034 0.017 0.013 0.01 ]
 AUC: 0.901 +- 0.188
+
+![Variance-Based p Definition](images/variance_based_p_recalls_0_1.png)
