@@ -233,7 +233,7 @@ Note that the original definition of $\phi_j$ is a special case of this weighted
 (as $h \to \infty$, every
 $\omega_i \to 1$).
 
-## Improved Definition of f
+## Forward-Pass f Definition
 
 The current definition of $f_j (t) = \bar x (t)^T \Sigma_{:j}$ is a mean of values in $\Sigma_{:j}$ among recipients who
 have already opened an email - thus representing mean influence of users who have already opened an email on user $j$
@@ -279,7 +279,7 @@ one-hot, i.e. exactly one opener). So $f_{SAE} (x (t))$ is a vector of probabili
 opening an email given the current state of opened templates, taking into account both individual and combined
 influences of users who have opened an email, as well as the influence of users who have not opened an email.
 
-# Improved Definition of p
+# Variance-Based p Definition
 
 As was noted in previous sections, it is desirable that $p_j$ represents a measure of information gain from sending an
 email to user $j$ in terms of gaining more information about other users, given that user $j$ opens their email.
@@ -312,7 +312,7 @@ Effectively, this is the variance of values in $\Sigma_{j:}$ among all recipient
 in $[0,1]$ (the factor of 4 ensures that the maximum possible variance of a Bernoulli variable, which is 0.25, scales to
 1).
 
-# Improved definition of s
+# Alternative s Definition
 
 As was noted in previous sections, 2 terms of $s_j (t)$: $\phi_j p_j$ and $f_j (t)$ have 2 orthogonal interpretations:
 exploration vs exploitation and historic vs current data.
@@ -404,7 +404,7 @@ slow opens rather than counting them identically to fast ones.
 We consider three ways of using $Y$ in place of $X$ when training the SAE, differing in whether the *input* to the
 autoencoder stays binary ($X$) or is replaced by the continuous $Y$.
 
-### Model A: $X \to Y$
+### Binary-to-TTO Model: $X \to Y$
 
 The simplest option keeps the SAE's input space unchanged (binary $x$), and only replaces the reconstruction target:
 
@@ -442,7 +442,7 @@ $$f_j (t) = \sigma (z (t) ^ T B_{E,D}) e_j = f_{SAE} (z (t)) e_j$$
 > (i.e. whether the TTO of early openers carries predictive signal the binary $x (t)$ does not) remains to be
 > validated.
 
-### Model B: $Y \to Y$
+### TTO-to-TTO Model: $Y \to Y$
 
 A more expressive option lets the SAE also *see* TTO information on the input side:
 
@@ -487,10 +487,91 @@ default of the two variants pending empirical comparison.
 $f_j (t)$ under Model B can reuse the same $z (t)$ construction as Model A; if anything, $z (t)$ is more in-distribution
 here, since the model was trained on continuous inputs rather than only binary ones.
 
-
 ### Downstream considerations
 
 - **$G$ calibration.** $s_j (t)$ (or $\pi_j (t)$ in the refined definition) feeds $\alpha_j (t) = G s_j (t)$ and
   $\beta_j (t) = G (1 - s_j (t))$. Regardless of how $s_j (t)$ is interpreted, this remains a Bernoulli-flavored
   construction; moving to a TTO-blended $\Sigma^Y$ shifts the numeric range/distribution of $s_j (t)$, so $G$
   (tuned against the original $X$-based $\Sigma$) likely needs re-tuning under any of Models A/B.
+
+## Experiments
+
+We perform a series of experiments to validate the proposed improvements and refinements to the model. The experiments
+are designed to evaluate the performance of the model with and without the proposed improvements, as well as to compare
+different variants of the proposed improvements.
+
+For each experiment, we perform a grid-search over the hyperparameters of the model and select the best performing model based on the validation set.
+
+The validation metric is given by AUC of the Recall curve of the model on the validation set:
+
+$$
+\text{AUC} = \int_{0}^{1} \text{Recall} (\tau) d\tau
+$$
+
+
+For each experiment we report Recall-AUC, Recall@5%, Recall@15%, Recall@25% and Recall@35% as well as smoothed Recall curve of the model on the test set.
+
+### Baseline Model
+
+Recalls: [0.385 0.821 0.923 0.958] +- [0.076 0.028 0.014 0.011]
+AUC: 0.894 +- 0.012
+
+We reproduced original paper results with minimal diviations:
+
+Recalls@25% Recall@50% Recall@75%
+[0.923 0.975 0.989] +- [0.014 0.008 0.004]
+
+
+### Dynamic Alpha Scheduling
+
+We have evaluated 3 variants of dynamic alpha scheduling: linear, geometric (log-linear) and confidence-based.
+
+#### Linear Alpha Scheduling
+
+Hyperparameters selected based of grid-search: $l = 0.1$, $r = 0.05$
+
+Recalls: [0.383 0.823 0.927 0.96 ] +- [0.073 0.023 0.012 0.01 ]
+AUC: 0.89 +- 0.213
+
+
+#### Geomatric Alpha Scheduling
+
+Hyperparameters selected based of grid-search: $l = 0.3$, $r = 0.05$
+
+Recalls: [0.377 0.823 0.927 0.959] +- [0.05  0.017 0.012 0.01 ]
+AUC: 0.894 +- 0.009
+
+#### Confidence-Based Alpha Scheduling
+
+Hyperparameters selected based of grid-search: $\kappa = 0.003$
+
+Recalls: [0.341 0.818 0.926 0.96 ] +- [0.031 0.022 0.014 0.01 ]
+AUC: 0.887 +- 0.22
+
+### Template Weights
+
+Hyperparameters selected based of grid-search: $h = 0.3$
+
+Recalls: [0.447 0.837 0.928 0.96 ] +- [0.041 0.018 0.014 0.011]
+AUC: 0.899 +- 0.196
+
+### Forward-Pass f Definition
+
+Hyperparameters selected based of grid-search: -
+
+Recalls: [0.375 0.841 0.937 0.966] +- [0.049 0.029 0.018 0.01 ]
+AUC: 0.896 +- 0.207
+
+### Alternative s Definition
+
+Hyperparameters selected based of grid-search: $\alpha (t)$ - confidence-based scheduling with $\kappa = 0.005$, $\beta (t)$ - geometric alpha scheduling with $l = 0.1$, $r = 0.05$
+
+Recalls: [0.425 0.821 0.922 0.959] +- [0.026 0.017 0.013 0.01 ]
+AUC: 0.895 +- 0.196
+
+### Variance-Based p Definition
+
+Hyperparameters selected based of grid-search: -
+
+Recalls: [0.479 0.837 0.926 0.96 ] +- [0.034 0.017 0.013 0.01 ]
+AUC: 0.901 +- 0.188
