@@ -279,7 +279,21 @@ All results below use our evaluation protocol (Section 9: Recall@5/15/25/35% and
 | Factored $s_j(t)$ | $\alpha(t)$: confidence, $\kappa=0.005$; $\beta(t)$: geometric, $l=0.1,\ r=0.05$ | 0.425 ± 0.026 | 0.821 ± 0.017 | 0.922 ± 0.013 | 0.959 ± 0.010 | 0.900 ± 0.008 |
 | Variance-based $p_j$ | — | 0.479 ± 0.034 | 0.837 ± 0.017 | 0.926 ± 0.013 | 0.960 ± 0.010 | 0.905 ± 0.009 |
 
-*(Per-variant smoothed recall curves are tracked as `images/<variant>_recalls_0_1.png` and referenced here as figure placeholders pending inclusion of the underlying plot files: baseline, linear/geometric/confidence $\alpha$-schedules, recency-weighted $\phi_j$, forward-pass $f_j(t)$, factored $s_j(t)$, variance-based $p_j$.)*
+![Baseline Model](images/baseline_recalls_0_1.png)
+
+![Linear Alpha Scheduling](images/linear_alpha_recalls_0_1.png)
+
+![Geometric Alpha Scheduling](images/geometric_alpha_recalls_0_1.png)
+
+![Confidence Alpha Scheduling](images/confidence_based_alpha_recalls_0_1.png)
+
+![Recency-weighted Phi](images/exp_template_weight_recalls_0_1.png)
+
+![Forward-pass F](images/forward_pass_f_recalls_0_1.png)
+
+![Factored S](images/alternative_s_recalls_0_1.png)
+
+![Variance-based P](images/variance_based_p_recalls_0_1.png)
 
 TTO incorporation (Section 8) is not yet included in this results table; it is presented above purely as a derivation pending implementation.
 
