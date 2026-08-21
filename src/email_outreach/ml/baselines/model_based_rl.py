@@ -35,7 +35,7 @@ class ModelBasedRLConfig(AbstractConfig):
             "n_value_iter": self.n_value_iter,
             "alpha_prior": self.alpha_prior,
             "beta_prior": self.beta_prior,
-            "kappa": self.kappa,
+            "dumping": self.kappa,
         }
 
     def to_filename(self) -> str:
@@ -114,9 +114,9 @@ class ModelBasedRL(AbstractContextualModel):
         self._p_open = alpha / (alpha + beta)  # posterior mean
         # Compute baseline open rate (user's marginal open rate)
         baseline_open_rate = df["opened"].mean()
-        # Adjust probabilities based on kappa
-        # When kappa=0, all streaks have the same probability (no causal effect)
-        # When kappa=1, use the full observed correlation
+        # Adjust probabilities based on dumping
+        # When dumping=0, all streaks have the same probability (no causal effect)
+        # When dumping=1, use the full observed correlation
         adjusted_p_open = baseline_open_rate + self.cfg.kappa * (
             self._p_open - baseline_open_rate
         )

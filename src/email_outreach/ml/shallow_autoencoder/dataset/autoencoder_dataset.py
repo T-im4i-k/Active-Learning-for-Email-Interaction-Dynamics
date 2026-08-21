@@ -30,6 +30,7 @@ class AutoencoderDataset(Dataset):
         self.mails = mails
         self.sender_id = sender_id
         self._mailshot_embeddings: np.ndarray = np.array([])
+        self._tto_matrix: np.ndarray = np.array([])
         self._time_to_open: Dict[int, Dict[int, float]] = (
             {}
         )  # mailshot_id -> user_id -> time_to_open
@@ -42,7 +43,7 @@ class AutoencoderDataset(Dataset):
         self._remove_users_with_no_opens(remove_users_below_n_opens)
         self._reverse_user_id_mapper: Dict[int, int] = {}
         self._mails_to_data()
-        self._mails_to_time_to_open()
+        self._mails_to_tto_data()
         self._user_clusters: Optional[pd.DataFrame] = None
         self._training_mask_recalc = 0
         logger.info(
@@ -73,6 +74,10 @@ class AutoencoderDataset(Dataset):
     @property
     def shape(self) -> Tuple[int, ...]:
         return self._mailshot_embeddings.shape
+
+    @property
+    def tto_matrix(self) -> torch.Tensor:
+        return torch.tensor(self._tto_matrix, dtype=torch.float64)
 
     @property
     def validation_mask(self) -> torch.tensor:
@@ -188,14 +193,14 @@ class AutoencoderDataset(Dataset):
 
         return datasets
 
-    def __getitem__(self, index) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Returns the training, validation and test tensor for the given index.
         :param index:
         :return: masked data by the training mask, masked data by the training mask, full data
         """
         x = torch.tensor(self._mailshot_embeddings[index])
-        return x * self.training_mask[index], x * self.validation_mask[index], x
+        return x, x
 
     def __len__(self):
         return len(self._mailshot_embeddings)
@@ -239,8 +244,8 @@ class AutoencoderDataset(Dataset):
             mailshot_embeddings.append(feature_vector)
         self._mailshot_embeddings = np.array(mailshot_embeddings).astype(np.float32)
 
-    def _mails_to_time_to_open(self):
-        # Calculate the average time to open for each user
+    def _mails_to_tto_data(self):
+        tto_matrix = []
         for mailshot_id in self.mails.mailshot_id.unique():
             mailshot_mails = self.mails[self.mails["mailshot_id"] == mailshot_id].copy()
             # Mean does not do anything here, there is only one value per user
@@ -252,12 +257,18 @@ class AutoencoderDataset(Dataset):
                     np.random.exponential(
                         abs(pd.to_timedelta(time_to_open).total_seconds() / 60)
                     )
-                    if time_to_open
+                    if pd.notna(time_to_open)
                     else np.inf
                 )
                 for user_id, time_to_open in time_to_open.items()
             }
             self._time_to_open[mailshot_id] = mailshot_tto
+
+            tto_row = np.full(len(self._user_id_mapper), np.inf, dtype=np.float64)
+            for user_id, tto in mailshot_tto.items():
+                tto_row[user_id] = tto
+            tto_matrix.append(tto_row)
+        self._tto_matrix = np.array(tto_matrix, dtype=np.float64)
 
     def number_of_opens_for_user(self, user_id: int) -> int:
         return self.mails[self.mails["user_id"] == user_id]["opened"].sum()

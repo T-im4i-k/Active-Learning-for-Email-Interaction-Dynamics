@@ -29,8 +29,11 @@ from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
 from email_outreach.ml.shallow_autoencoder.coef_scheduler import AbstractCoefScheduler, CoefSchedulerArgs, \
     AlphaSchedulerFactory, BetaSchedulerFactory
 from email_outreach.ml.shallow_autoencoder.dataset.template_weight import AbstractTemplateWeight, TemplateWeightFactory
-
-from email_outreach.ml.shallow_autoencoder.dataset.time_masked_autoencoder_dataset import TimeMaskedAutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.dataset.tto_autoencoder_dataset import BinaryToTTOAutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.dataset.tto_decay import TTODecayFactory, AbstractTTODecay
+from email_outreach.ml.shallow_autoencoder.dataset.cutoff_dataset import CutoffDataset
+from email_outreach.ml.shallow_autoencoder.dataset.noisy_dataset import NoisyDataset
+# from email_outreach.ml.shallow_autoencoder.dataset.time_masked_autoencoder_dataset import TimeMaskedAutoencoderDataset
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +65,10 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
     dropout: float = 0.0
     flipped: bool = False
     p_type: Literal["mean", "var", "std"] = "mean"
+    autoencoder_type: Literal["original","binary_to_tto", "tto_to_tto", "cutoff", "noisy"] = "original"
+    tto_decay: dict = field(default_factory=lambda: {})
+    cutoff: float| None = None
+    noise_params: dict = field(default_factory=lambda: {})
 
     def to_dict(self):
         return {
@@ -89,6 +96,10 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "flipped": self.flipped,
             "j": self.j,
             "p_type": self.p_type,
+            "autoencoder_type": self.autoencoder_type,
+            "tto_decay": self.tto_decay,
+            "cutoff": self.cutoff,
+            "noise_params": self.noise_params
         }
 
     @classmethod
@@ -106,6 +117,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self._autoencoder: Optional[ShallowAutoencoder] = None
         self.last_p: torch.Tensor = torch.zeros(0)
         self.last_prenormalized_f: torch.Tensor = torch.zeros(0)
+        self.tto_decay: AbstractTTODecay | None = TTODecayFactory.from_config(config.to_dict())
 
         self.alpha_scheduler: AbstractCoefScheduler = AlphaSchedulerFactory.from_config(config.to_dict())
         self.beta_scheduler: AbstractCoefScheduler | None = BetaSchedulerFactory.from_config(config.to_dict())
@@ -144,14 +156,67 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
     def fit(
             self,
-            train: AutoencoderDataset | torch.Tensor,
-            val: AutoencoderDataset | torch.Tensor,
+            train: AutoencoderDataset,
+            val: AutoencoderDataset,
     ) -> None:
         super().fit(train, val)
 
         weight_config = self.config.to_dict() | {"min_template_id": self.train.min_template_id,
                                                  "max_template_id": self.train.max_template_id}
         self._template_weight = TemplateWeightFactory.from_config(weight_config)
+
+        train_dataset = train
+        val_dataset = val
+        positive_threshold = 0.5
+        match self.config.autoencoder_type:
+            case "original":
+                pass
+            case "binary_to_tto":
+                if self.tto_decay is None:
+                    raise ValueError("TTO Decay must be provided")
+
+                train_dataset = BinaryToTTOAutoencoderDataset(
+                    autoencoder_dataset = train_dataset,
+                    tto_decay = self.tto_decay
+                )
+                val_dataset = BinaryToTTOAutoencoderDataset(
+                    autoencoder_dataset = val_dataset,
+                    tto_decay = self.tto_decay
+                )
+
+                positive_threshold = 0.0
+            case "tto_to_tto":
+                raise NotImplementedError("Not Implemented Yet")
+            case "cutoff":
+                if self.config.cutoff is None:
+                    raise ValueError("Cutoff must be provided")
+
+                train_dataset = CutoffDataset(
+                    autoencoder_dataset = train_dataset,
+                    cutoff_minutes = self.config.cutoff
+                )
+                val_dataset = CutoffDataset(
+                    autoencoder_dataset = val_dataset,
+                    cutoff_minutes = self.config.cutoff
+                )
+            case "noisy":
+                if len(self.config.noise_params) == 0:
+                    raise ValueError("No noise parameters provided")
+
+                train_dataset = NoisyDataset(
+                    autoencoder_dataset = train_dataset,
+                    p_min = self.config.noise_params["p_min"],
+                    p_max = self.config.noise_params["p_max"],
+                )
+                val_dataset = NoisyDataset(
+                    autoencoder_dataset = val_dataset,
+                    p_min = self.config.noise_params["p_min"],
+                    p_max = self.config.noise_params["p_max"],
+                )
+
+            case _:
+                raise ValueError(f"Unknown autoencoder type : {self.config.autoencoder_type}")
+
         self._autoencoder = ShallowAutoencoder(
             n=train.num_users,
             d=self.config.d,
@@ -163,14 +228,14 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         logger.info("Fitting the autoencoder")
         self.autoencoder.fit(
-            self.train,
+            train_dataset,
             epochs=self.config.epochs,
             lr=self.config.lr,
             batch_size=self.config.batch_size,
             weight_decay=self.config.wd,
             positive_weight=self.config.positive_weight,
-            val=self.val,
-            full_training=True,
+            val=val_dataset,
+            positive_threshold = positive_threshold
         )
         # TrainingMetrics.plot_average_ndcg(self.autoencoder.training_metrics)
         # TrainingMetrics.plot_f1_score(self.autoencoder.training_metrics)
@@ -370,7 +435,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             final_predictions: torch.Tensor,
     ) -> List[ContextualBanditMetrics]:
         binary_results: torch.Tensor = dataset[mailshot_id][
-            2
+            1
         ]  # 1 because the 0 is masked for training
         prediction = deepcopy(final_predictions)
 

@@ -217,9 +217,44 @@ class ShallowAutoencoder(nn.Module):
         out = out - (X * diag_vals)
         return torch.sigmoid(out)
 
+    def fit_improved(
+            self,
+            train: Dataset,
+            epochs,
+            lr,
+            batch_size,
+            weight_decay,
+            positive_weight,
+            positive_threshold,
+    ):
+        set_seed(42)
+        train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
+        optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
+        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
+        criterion = nn.BCELoss(reduction="none")
+
+        for epoch in range(epochs):
+            self.train()
+            for batch_data, target_data in train_loader:
+                # print(f"=={batch_data.mean()=}==")
+                # print(f"=={target_data.mean()=}==")
+                optimizer.zero_grad()
+
+                reconstruction = self.forward(batch_data)
+
+                loss = criterion(reconstruction, target_data)
+
+                weights = torch.where(target_data > positive_threshold, positive_weight, 1)
+                loss.backward(weights)
+                optimizer.step()
+            scheduler.step()
+            print(f"=== Epoch {epoch} ===")
+
+        return self.training_metrics
+
     def fit(
         self,
-        train: Dataset | torch.Tensor,
+        train: Dataset,
         epochs=10,
         lr=1e-3,
         batch_size=1024,
@@ -227,16 +262,24 @@ class ShallowAutoencoder(nn.Module):
         positive_weight=5.0,
         label_smoothing=0.0,
         val: Dataset | torch.Tensor = None,
-        full_training: bool = False,
+        positive_threshold: float = 0.5,
     ):
+
+        return self.fit_improved(
+            train=train,
+            epochs=epochs,
+            lr=lr,
+            batch_size=batch_size,
+            weight_decay=weight_decay,
+            positive_weight=positive_weight,
+            positive_threshold=positive_threshold
+        )
+
         """
         Trains the model on the given dataset X and calculates validation IoU if a validation set is provided.
         IoU calculation reference (Jaccard index): https://en.wikipedia.org/wiki/Jaccard_index
         """
         set_seed(42)
-
-        if isinstance(train, torch.Tensor):
-            train = TensorDataset(train)
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
 
         if val is not None:
@@ -256,13 +299,7 @@ class ShallowAutoencoder(nn.Module):
             self.train()
             train_loss = 0.0
             training_ndcg = 0.0
-            for training_batch, learning_batch, validation_batch in train_loader:
-                if full_training:
-                    batch_data = learning_batch
-                    target_data = validation_batch
-                else:
-                    batch_data = training_batch
-                    target_data = learning_batch
+            for batch_data, target_data in train_loader:
                 batch_data = batch_data.to(self.device)
                 optimizer.zero_grad()
 
@@ -278,7 +315,7 @@ class ShallowAutoencoder(nn.Module):
                 # print(loss.shape)
 
                 # Weighted loss
-                weights = torch.where(batch_data > 0.5, positive_weight, 1)
+                weights = torch.where(batch_data > positive_threshold, positive_weight, 1)
                 mask = target_data - batch_data
                 weights_unseen_data = torch.where(mask > 0.5, 0.5, 0)
                 weights = weights + weights_unseen_data
@@ -310,7 +347,7 @@ class ShallowAutoencoder(nn.Module):
                 f1_scores = []
                 num_batches = 0
                 with torch.no_grad():
-                    for batch_data, _, val_data in train_loader:
+                    for batch_data, val_data in train_loader:
                         # NDCG
                         batch_data, val_data = batch_data.to(self.device), val_data.to(
                             self.device
@@ -353,7 +390,7 @@ class ShallowAutoencoder(nn.Module):
                 val_f1_scores = []
                 val_iou_scores = []
                 with torch.no_grad():
-                    for batch_data_val, _, val_data_val in val_loader:
+                    for batch_data_val, val_data_val in val_loader:
                         batch_data_val = batch_data_val.to(self.device)
                         val_data_val = val_data_val.to(self.device)
 
