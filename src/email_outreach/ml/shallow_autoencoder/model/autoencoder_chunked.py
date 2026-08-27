@@ -198,6 +198,7 @@ class DeepAutoencoder(nn.Module):
     def fit_improved(
             self,
             train: Dataset,
+            val: Dataset,
             epochs,
             lr,
             batch_size,
@@ -206,22 +207,68 @@ class DeepAutoencoder(nn.Module):
             positive_threshold,
     ):
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val, batch_size=batch_size, shuffle=False)
+
         optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
         criterion = nn.BCELoss(reduction="none")
 
         for epoch in range(epochs):
             self.train()
+            train_loss = 0.0
+            train_samples = 0
             for batch_data, target_data in train_loader:
                 optimizer.zero_grad()
 
                 reconstruction = self.forward(batch_data)
                 loss = criterion(reconstruction, target_data)
-                weights = torch.where(target_data > positive_threshold, positive_weight, 1)
-                loss.backward(weights)
+
+                weights = torch.where(
+                    target_data > positive_threshold,
+                    positive_weight,
+                    1,
+                )
+                weighted_loss = loss * weights
+
+                # Mean loss for this batch, used for optimization
+                batch_loss = weighted_loss.mean()
+                batch_loss.backward()
                 optimizer.step()
+
+                train_loss += weighted_loss.sum().item()
+                train_samples += target_data.numel()
+
+            train_loss /= train_samples
+
+            # Validation
+            self.eval()
+            val_loss = 0.0
+            val_samples = 0
+
+            with torch.no_grad():
+                for batch_data, target_data in val_loader:
+                    reconstruction = self.forward(batch_data)
+                    loss = criterion(reconstruction, target_data)
+
+                    weights = torch.where(
+                        target_data > positive_threshold,
+                        positive_weight,
+                        1,
+                    )
+                    weighted_loss = loss * weights
+
+                    val_loss += weighted_loss.sum().item()
+                    val_samples += target_data.numel()
+
+            val_loss /= val_samples
+
             scheduler.step()
-            print(f"=== Epoch {epoch} ===")
+
+            print(
+                f"=== Epoch {epoch} | "
+                f"Train loss: {train_loss:.6f} | "
+                f"Val loss: {val_loss:.6f} ==="
+            )
 
     def fit(
             self,
@@ -238,6 +285,7 @@ class DeepAutoencoder(nn.Module):
 
         return self.fit_improved(
             train=train,
+            val = val,
             epochs=epochs,
             lr=lr,
             batch_size=batch_size,
