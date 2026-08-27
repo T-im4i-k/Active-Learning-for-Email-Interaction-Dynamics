@@ -528,52 +528,56 @@ $$\min_{E,D} l (X, \sigma (C B_{E,D}))$$
 
 # Deep Autoencoder
 
-The shallow SAE's reconstruction function $\sigma (xB_{E,D})$ is, up to the final sigmoid, a single linear function of
-the input $x$:
-$B_{E,D} = ED^T - \mathrm{diag} ([E \odot D]\mathbf{1}_m)$ is one $m \times m$ matrix, so every predicted entry (before sigmoid) is a
-linear combination of the input entries. This means the model can only capture simple linear relationships - limiting its expressive power.
+The SAE described in the Recap section reconstructs $\sigma (xB_{E,D})$, where
+$B_{E,D} = ED^T - \mathrm{diag} ([E \odot D]\mathbf{1}_m)$ is a single, fixed $m \times m$ matrix that does not depend
+on $x$. Consequently, every predicted entry (before the final sigmoid) is a linear combination of the input entries -
+the model can only capture simple linear relationships between recipients.
 
-As noted in the Forward-Pass $f$ Definition section, however, neither $p_j$ nor $f_j (t)$ actually needs $\Sigma$ as an
-explicit matrix - both are expressible purely as forward passes through the trained autoencoder:
+As noted in the Forward-Pass $f$ Definition section, however, neither $p_j$ nor $f_j (t)$ actually requires $\Sigma$ as
+an explicit matrix - both are already expressible purely as forward passes through the trained autoencoder:
 
 $$
 p_j = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} f_{SAE} (e_j) e_i, \quad f_j (t) = f_{SAE} (x (t)) e_j
 $$
 
-> Note that we consider a forward-pass definition of $f_j (t)$
+> We consider the forward-pass definition of $f_j (t)$ introduced in previous sections, rather than the original
+> $\bar x (t)^T \Sigma_{:j}$ formula.
 
-This allows us to swap in a deeper, non-linear autoencoder without changing the definitions of $p_j$ or $f_j (t)$.
+Since $p_j$ and $f_j (t)$ depend only on the ability to query $f_{SAE}$, and not on any explicit property of
+$B_{E,D}$ itself, we can swap in a deeper, non-linear autoencoder without changing either definition.
 
-We propose a two-layer encoder/decoder, with a ReLU nonlinearity between the layers on each side:
+### A Two-Layer Encoder/Decoder
+
+We propose a two-layer encoder and decoder, with a ReLU nonlinearity between the two linear layers on each side:
 
 $$\text{Encoder: Linear} (m, 2d) \to \text{ReLU} \to \text{Linear} (2d, d)$$
 $$\text{Decoder: Linear} (d, 2d) \to \text{ReLU} \to \text{Linear} (2d, m)$$
 
-with $d$ retaining its role as the bottleneck size
-
-Then:
+where $d$ retains its role as the bottleneck size from the Recap section. The resulting reconstruction function is:
 
 $$
-f_{DAE}(x) = (\sigma \circ \text{Decoder} \circ \text{Encoder})(x)
+f_{DAE} (x) = (\sigma \circ \text{Decoder} \circ \text{Encoder}) (x)
 $$
 
-We optionally add dropout and/or layer normalization at the bottleneck, consistent with common regularization for deeper
-collaborative-filtering autoencoders, to control overfitting given the added capacity relative to the shallow model.
+We optionally add dropout and/or layer normalization at the bottleneck, consistent with common regularization practice
+for deeper collaborative-filtering autoencoders, to control overfitting given the added capacity relative to the
+original SAE.
 
-> Note that we no longer use the explicit diagonal-zeroing operation on $B_{E,D}$, since there is no single weight
-> matrix to constrain in a deep network. Instead, we rely on a statistical safeguard: at each training step, we randomly
-> mask a subset of the input entries to $0$ and require the network to reconstruct the *full*, unmasked $X$. This makes
-> the autoencoder denoising in the classic sense, and forces every prediction to depend on other recipients' entries
-> rather than a shortcut through the recipient's own.
+> **On the diagonal constraint.** The original SAE explicitly zeroes the diagonal of $B_{E,D}$ to rule out the trivial
+> solution of a recipient predicting their own entry. A deep network has no single weight matrix to constrain this way,
+> so we substitute a statistical safeguard instead: at each training step, we randomly mask a subset of the input
+> entries to $0$ and require the network to reconstruct the *full*, unmasked $X$. This makes the autoencoder denoising
+> in the classic sense, and forces every prediction to depend on other recipients' entries rather than a shortcut
+> through the recipient's own.
 
-
-And the training objective becomes:
+The training objective becomes:
 
 $$
 \min_{\theta} l (X, f_{DAE} (X; \theta))
 $$
 
-then $p_j$ and $f_j(t)$ simply become:
+where $\theta$ collects the parameters of both the encoder and decoder layers. Under this substitution, $p_j$ and
+$f_j (t)$ retain their forward-pass definitions exactly, with $f_{SAE}$ replaced by $f_{DAE}$:
 
 $$
 p_j = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} f_{DAE} (e_j) e_i, \quad f_j (t) = f_{DAE} (x (t)) e_j
