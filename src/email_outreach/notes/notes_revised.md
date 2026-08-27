@@ -358,7 +358,7 @@ A strong advantage of the refined definition of $s_j (t)$ is reusal of the primi
 of $s_j (t)$, which allows for plug-and-play reusal of the of the improvements and modifications proposed in previous
 sections.
 
-## Incorporating Time-to-Open (TTO)
+# Incorporating Time-to-Open (TTO)
 
 The autoencoder is currently trained purely on $X$, the binary open/no-open matrix. This discards a second signal we
 have available for every observed open: the time-to-open (TTO). Two recipients who both eventually open a template are
@@ -494,6 +494,30 @@ here, since the model was trained on continuous inputs rather than only binary o
   construction; moving to a TTO-blended $\Sigma^Y$ shifts the numeric range/distribution of $s_j (t)$, so $G$
   (tuned against the original $X$-based $\Sigma$) likely needs re-tuning under any of Models A/B.
 
+
+# TTO Cutoff Thresholding
+
+- Currently, SAE is trained on full binary template vectors - regardless of when the open occurred.
+- However, during active leadning we only observe opens within a short operational window ($\frac{T}{b}$ between batches and $T$ overall)
+- This means that models sees late opens as non-opens
+- We try to model similar pattern during SAE training (to match training and active learning operational modes)
+- Let $\Delta$ denote the matrix of observed TTOs, where $\Delta_{i,j}$ is the time between sending and opening of template $i$ by recipient $j$. For recipients who did not open template $i$, we set $\Delta_{i,j} = +\infty$.
+- We introduce a cutoff threshold $\delta_c \in [0, +\infty)$ and define a new binary matrix $C$, where $C_{i,j} = \mathbb{1}[\Delta_{i,j} \le \delta_c]$
+- The SAE is trained as $$\min_{E,D} l (X, \sigma (C B_{E,D}))$$, reconstructing the original binary open/no-open matrix $X$ from the cutoff-thresholded matrix $C$.
+
+# Deep Autoencoder
+
+- As was noted in previous sections, both $p_j$ and $f_j(t)$ can be expressed fully in terms of forward-pass through the trained autoencoder, without any need for precomputation of $\Sigma$:
+$$
+p_j = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} f_{SAE} (e_j) e_i, \quad f_j (t) = f_{SAE} (x (t)) e_j
+$$
+> Note that we are using forward-pass definition of $f_j(t)$
+- This allows for more flexibility in the architecture of the autoencoder, as well as the possibility of using a deeper autoencoder with more layers, which might capture more complex interactions between users and templates
+- We propose a model with 2 linear layers separated by a ReLU activation function for both encode and decoder
+- That is, the encoder can be defined as Linear($m$, $2d$) -> ReLU -> Linear($2d$, $d$) and the decoder can be defined as Linear($d$, $2d$) -> ReLU -> Linear($2d$, $m$)
+- In latent space, we optionally add a dropout layer and/or layer norm - similar to the original SAE architecture, to prevent overfitting and improve generalization.
+- We additionall mask the input to the autoencoder during training, as was done in the original SAE architecture, to prevent overfitting and improve generalization, making our autoencoder denoising.
+
 ## Experiments
 
 We perform a series of experiments to validate the proposed improvements and refinements to the model. The experiments
@@ -591,3 +615,21 @@ Recalls: [0.479 0.837 0.926 0.96 ] +- [0.034 0.017 0.013 0.01 ]
 AUC: 0.905 ± 0.009
 
 ![Variance-Based p Definition](images/variance_based_p_recalls_0_1.png)
+
+### TTO Cutoff Thresholding
+
+Hyperparameters selected based of grid-search: $\delta_c = 720$
+
+Recalls: [0.39  0.824 0.924 0.96 ] +- [0.038 0.016 0.012 0.01 ]
+AUC: 0.895 +- 0.008
+
+![TTO Cutoff Thresholding](images/tto_cutoff_recalls_0_1.png)
+
+### Deep Autoencoder
+
+Hyperparameters selected based of grid-search: $d=16$
+
+Recalls: [0.4   0.815 0.936 0.963] +- [0.09  0.085 0.019 0.011]
+AUC: 0.898 +- 0.019
+
+![Deep Autoencoder](images/deep_autoencoder_recalls_0_1.png)
