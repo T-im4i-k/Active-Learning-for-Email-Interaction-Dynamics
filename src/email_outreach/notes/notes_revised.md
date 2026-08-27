@@ -494,37 +494,100 @@ here, since the model was trained on continuous inputs rather than only binary o
   construction; moving to a TTO-blended $\Sigma^Y$ shifts the numeric range/distribution of $s_j (t)$, so $G$
   (tuned against the original $X$-based $\Sigma$) likely needs re-tuning under any of Models A/B.
 
-
 # TTO Cutoff Thresholding
 
-- Currently, SAE is trained on full binary template vectors - regardless of when the open occurred.
-- However, during active leadning we only observe opens within a short operational window ($\frac{T}{b}$ between batches and $T$ overall)
-- This means that models sees late opens as non-opens
-- We try to model similar pattern during SAE training (to match training and active learning operational modes)
-- Let $\Delta$ denote the matrix of observed TTOs, where $\Delta_{i,j}$ is the time between sending and opening of template $i$ by recipient $j$. For recipients who did not open template $i$, we set $\Delta_{i,j} = +\infty$.
-- We introduce a cutoff threshold $\delta_c \in [0, +\infty)$ and define a new binary matrix $C$, where $C_{i,j} = \mathbb{1}[\Delta_{i,j} \le \delta_c]$
-- The SAE is trained as $$\min_{E,D} l (X, \sigma (C B_{E,D}))$$, reconstructing the original binary open/no-open matrix $X$ from the cutoff-thresholded matrix $C$.
+The original SAE described in the Recap section is trained on the full binary matrix $X$: a row $X_{i:}$ reflects every
+recipient who eventually opened template $i$, no matter how much time elapsed between sending and opening. During active
+learning, however, the state vector $x (t)$ that the model is actually queried on is necessarily incomplete: for
+any $t < T$, a recipient who ends up opening after $t$ still shows up as a non-opener. Training rows are therefore
+"converged" patterns, while active-learning queries are "still-evolving" ones.
+
+We try to address this mismatch by censoring the SAE's training input the same way the active learning phase censors
+$x (t)$. Reusing the TTO matrix $\Delta$ from the Incorporating Time-to-Open section ($\Delta_{i,j}$ the observed
+send-to-open time, with $\Delta_{i,j} = +\infty$ for non-openers), we fix a cutoff threshold $\delta_c \in [0, +\infty)$
+and define a thresholded binary matrix $C$:
+
+$$C_{i,j} = \mathbb{1}[\Delta_{i,j} \le \delta_c]$$
+
+$C$ keeps only the opens that happened fast enough to plausibly be observed during an active operational window, and
+treats every slower open as a non-open - exactly the censoring a recipient's true eventual behavior is subject to during
+active learning. The SAE is then trained to recover the true, eventual open pattern from this censored view:
+
+$$\min_{E,D} l (X, \sigma (C B_{E,D}))$$
+
+> **Relation to the $Y$-based decay above.** The Incorporating Time-to-Open section already anticipates this
+> construction as the $h_\delta \to 0$ limit of the decayed label $Y$, turning the soft exponential discount into a
+> hard step function. The two constructions are complementary: $Y$ softly reweights the
+> *target* to reflect how informative a given open is, while $C$ hard-masks the *input* to reflect what is actually
+> visible to the model at query time.
+
+> **Choosing $\delta_c$.** As $\delta_c \to \infty$, $C \to X$ and the model reduces exactly to the original
+> formulation. At the other extreme, $\delta_c \to 0$ collapses $C$ toward the zero matrix, discarding all
+> training signal. The useful range in between should be anchored to timescales the model already has available - the
+> batch interval $T/b$ and the overall deadline $T$.
 
 # Deep Autoencoder
 
-- As was noted in previous sections, both $p_j$ and $f_j(t)$ can be expressed fully in terms of forward-pass through the trained autoencoder, without any need for precomputation of $\Sigma$:
+The shallow SAE's reconstruction function $\sigma (xB_{E,D})$ is, up to the final sigmoid, a single linear function of
+the input $x$:
+$B_{E,D} = ED^T - \mathrm{diag} ([E \odot D]\mathbf{1}_m)$ is one $m \times m$ matrix, so every predicted entry (before sigmoid) is a
+linear combination of the input entries. This means the model can only capture simple linear relationships - limiting its expressive power.
+
+As noted in the Forward-Pass $f$ Definition section, however, neither $p_j$ nor $f_j (t)$ actually needs $\Sigma$ as an
+explicit matrix - both are expressible purely as forward passes through the trained autoencoder:
+
 $$
 p_j = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} f_{SAE} (e_j) e_i, \quad f_j (t) = f_{SAE} (x (t)) e_j
 $$
-> Note that we are using forward-pass definition of $f_j(t)$
-- This allows for more flexibility in the architecture of the autoencoder, as well as the possibility of using a deeper autoencoder with more layers, which might capture more complex interactions between users and templates
-- We propose a model with 2 linear layers separated by a ReLU activation function for both encode and decoder
-- That is, the encoder can be defined as Linear($m$, $2d$) -> ReLU -> Linear($2d$, $d$) and the decoder can be defined as Linear($d$, $2d$) -> ReLU -> Linear($2d$, $m$)
-- In latent space, we optionally add a dropout layer and/or layer norm - similar to the original SAE architecture, to prevent overfitting and improve generalization.
-- We additionall mask the input to the autoencoder during training, as was done in the original SAE architecture, to prevent overfitting and improve generalization, making our autoencoder denoising.
 
-## Experiments
+> Note that we consider a forward-pass definition of $f_j (t)$
+
+This allows us to swap in a deeper, non-linear autoencoder without changing the definitions of $p_j$ or $f_j (t)$.
+
+We propose a two-layer encoder/decoder, with a ReLU nonlinearity between the layers on each side:
+
+$$\text{Encoder: Linear} (m, 2d) \to \text{ReLU} \to \text{Linear} (2d, d)$$
+$$\text{Decoder: Linear} (d, 2d) \to \text{ReLU} \to \text{Linear} (2d, m)$$
+
+with $d$ retaining its role as the bottleneck size
+
+Then:
+
+$$
+f_{DAE}(x) = (\sigma \circ \text{Decoder} \circ \text{Encoder})(x)
+$$
+
+We optionally add dropout and/or layer normalization at the bottleneck, consistent with common regularization for deeper
+collaborative-filtering autoencoders, to control overfitting given the added capacity relative to the shallow model.
+
+> Note that we no longer use the explicit diagonal-zeroing operation on $B_{E,D}$, since there is no single weight
+> matrix to constrain in a deep network. Instead, we rely on a statistical safeguard: at each training step, we randomly
+> mask a subset of the input entries to $0$ and require the network to reconstruct the *full*, unmasked $X$. This makes
+> the autoencoder denoising in the classic sense, and forces every prediction to depend on other recipients' entries
+> rather than a shortcut through the recipient's own.
+
+
+And the training objective becomes:
+
+$$
+\min_{\theta} l (X, f_{DAE} (X; \theta))
+$$
+
+then $p_j$ and $f_j(t)$ simply become:
+
+$$
+p_j = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} f_{DAE} (e_j) e_i, \quad f_j (t) = f_{DAE} (x (t)) e_j
+$$
+
+
+# Experiments
 
 We perform a series of experiments to validate the proposed improvements and refinements to the model. The experiments
 are designed to evaluate the performance of the model with and without the proposed improvements, as well as to compare
 different variants of the proposed improvements.
 
-For each experiment, we perform a grid-search over the hyperparameters of the model and select the best performing model based on the validation set.
+For each experiment, we perform a grid-search over the hyperparameters of the model and select the best performing model
+based on the validation set.
 
 The validation metric is given by AUC of the Recall curve of the model on the validation set:
 
@@ -532,8 +595,8 @@ $$
 \text{AUC} = \int_{0}^{1} \text{Recall} (\tau) d\tau
 $$
 
-
-For each experiment we report Recall-AUC, Recall@5%, Recall@15%, Recall@25% and Recall@35% as well as smoothed Recall curve of the model on the test set.
+For each experiment we report Recall-AUC, Recall@5%, Recall@15%, Recall@25% and Recall@35% as well as smoothed Recall
+curve of the model on the test set.
 
 ### Baseline Model
 
@@ -547,7 +610,6 @@ We reproduced original paper results with minimal diviations:
 Recalls@25% Recall@50% Recall@75%
 [0.923 0.975 0.989] +- [0.014 0.008 0.004]
 
-
 ### Dynamic Alpha Scheduling
 
 We have evaluated 3 variants of dynamic alpha scheduling: linear, geometric (log-linear) and confidence-based.
@@ -560,7 +622,6 @@ Recalls: [0.383 0.823 0.927 0.96 ] +- [0.073 0.023 0.012 0.01 ]
 AUC: 0.894 ± 0.011
 
 ![Linear Alpha Scheduling](images/linear_alpha_recalls_0_1.png)
-
 
 #### Geomatric Alpha Scheduling
 
@@ -600,7 +661,8 @@ AUC: 0.901 ± 0.011
 
 ### Alternative s Definition
 
-Hyperparameters selected based of grid-search: $\alpha (t)$ - confidence-based scheduling with $\kappa = 0.005$, $\beta (t)$ - geometric alpha scheduling with $l = 0.1$, $r = 0.05$
+Hyperparameters selected based of grid-search: $\alpha (t)$ - confidence-based scheduling
+with $\kappa = 0.005$, $\beta (t)$ - geometric alpha scheduling with $l = 0.1$, $r = 0.05$
 
 Recalls: [0.425 0.821 0.922 0.959] +- [0.026 0.017 0.013 0.01 ]
 AUC: 0.900 ± 0.008
@@ -612,7 +674,7 @@ AUC: 0.900 ± 0.008
 Hyperparameters selected based of grid-search: -
 
 Recalls: [0.479 0.837 0.926 0.96 ] +- [0.034 0.017 0.013 0.01 ]
-AUC: 0.905 ± 0.009
+AUC: 0.905 +- 0.009
 
 ![Variance-Based p Definition](images/variance_based_p_recalls_0_1.png)
 
