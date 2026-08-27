@@ -24,6 +24,7 @@ from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
 from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
     ShallowAutoencoder,
     TrainingMetrics,
+    DeepAutoencoder
 )
 
 from email_outreach.ml.shallow_autoencoder.coef_scheduler import AbstractCoefScheduler, CoefSchedulerArgs, \
@@ -69,6 +70,8 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
     tto_decay: dict = field(default_factory=lambda: {})
     cutoff: float| None = None
     noise_params: dict = field(default_factory=lambda: {})
+    deep_autoencoder: bool = False
+    sae_bias: bool = False
 
     def to_dict(self):
         return {
@@ -99,7 +102,9 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "autoencoder_type": self.autoencoder_type,
             "tto_decay": self.tto_decay,
             "cutoff": self.cutoff,
-            "noise_params": self.noise_params
+            "noise_params": self.noise_params,
+            "deep_autoencoder": self.deep_autoencoder,
+            "sae_bias": self.sae_bias
         }
 
     @classmethod
@@ -114,7 +119,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
     def __init__(self, config: ContextualBanditWithAutoencoderConfig):
         super().__init__(config)
-        self._autoencoder: Optional[ShallowAutoencoder] = None
+        self._autoencoder = None
         self.last_p: torch.Tensor = torch.zeros(0)
         self.last_prenormalized_f: torch.Tensor = torch.zeros(0)
         self.tto_decay: AbstractTTODecay | None = TTODecayFactory.from_config(config.to_dict())
@@ -217,12 +222,21 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             case _:
                 raise ValueError(f"Unknown autoencoder type : {self.config.autoencoder_type}")
 
-        self._autoencoder = ShallowAutoencoder(
-            n=train.num_users,
-            d=self.config.d,
-            layer_norm=self.config.layer_norm,
-            dropout_p=self.config.dropout,
-        )
+        if self.config.deep_autoencoder:
+            self._autoencoder = DeepAutoencoder(
+                n=train.num_users,
+                d=self.config.d,
+                dropout_p=self.config.dropout,
+            )
+        else:
+            self._autoencoder = ShallowAutoencoder(
+                n=train.num_users,
+                d=self.config.d,
+                layer_norm=self.config.layer_norm,
+                dropout_p=self.config.dropout,
+                bias=self.config.sae_bias,
+                popularity=self.calculate_popularity()
+            )
         self.last_p: torch.Tensor = torch.zeros(train.num_users)
         self.last_prenormalized_f: torch.Tensor = torch.zeros(train.num_users)
 

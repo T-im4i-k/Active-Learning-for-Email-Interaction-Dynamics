@@ -13,5 +13,6 @@ class CutoffDataset(Dataset):
         return len(self._cutoff_dataset)
 
     def __getitem__(self, index):
-        x = torch.tensor(self._cutoff_dataset[index])
-        return x, x
+        cutoff = torch.tensor(self._cutoff_dataset[index])
+        x = torch.tensor(self.autoencoder_dataset._mailshot_embeddings[index])
+        return cutoff, x

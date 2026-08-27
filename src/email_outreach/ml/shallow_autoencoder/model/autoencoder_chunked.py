@@ -12,6 +12,8 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 
 from email_outreach.utils.common_utils import set_seed
 
+from typing import OrderedDict
+
 # References:
 # - Sedhain S. et al., "AutoRec: Autoencoders Meet Collaborative Filtering," WWW 2015.
 #   https://arxiv.org/abs/1508.01195
@@ -139,6 +141,113 @@ class TrainingMetrics:
         plt.show()
 
 
+class DeepAutoencoder(nn.Module):
+    def __init__(
+            self, n: int, d: int, dropout_p=0.0,
+    ):
+        super().__init__()
+
+
+        self.encoder = nn.Sequential(
+            OrderedDict([
+                ("encoder_l1", nn.Linear(in_features=n, out_features=2*d)),
+                ("encoder_relu1", nn.ReLU()),
+                ("encoder_l2", nn.Linear(in_features=2*d, out_features=d))
+            ])
+        )
+
+        # nn.init.xavier_uniform_(self.encoder.weight)
+
+        self.dropout = nn.Dropout(p=dropout_p)
+        self.norm = nn.LayerNorm(d)
+
+        self.decoder = nn.Sequential(
+            OrderedDict([
+                ("decoder_l1", nn.Linear(in_features=d, out_features=2*d)),
+                ("decoder_relu1", nn.ReLU()),
+                ("decoder_l2", nn.Linear(in_features=2*d, out_features=n))
+            ])
+        )
+
+        # nn.init.xavier_uniform_(self.decoder.weight)
+
+        self.sigmoid = nn.Sigmoid()
+
+
+    def forward(self, X):
+        X = self.encoder(X)
+        X = self.dropout(X)
+        X = self.norm(X)
+        X = self.decoder(X)
+        return self.sigmoid(X)
+
+    def forward_for_user(self, x):
+        return self.forward(x)
+
+
+    def predict(self, X):
+        self.eval()
+        with torch.no_grad():
+            return self.forward(X)
+
+    def predict_for_user(self, X):
+        self.eval()
+        with torch.no_grad():
+            return self.forward_for_user(X)
+
+    def fit_improved(
+            self,
+            train: Dataset,
+            epochs,
+            lr,
+            batch_size,
+            weight_decay,
+            positive_weight,
+            positive_threshold,
+    ):
+        train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
+        optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
+        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
+        criterion = nn.BCELoss(reduction="none")
+
+        for epoch in range(epochs):
+            self.train()
+            for batch_data, target_data in train_loader:
+                optimizer.zero_grad()
+
+                reconstruction = self.forward(batch_data)
+                loss = criterion(reconstruction, target_data)
+                weights = torch.where(target_data > positive_threshold, positive_weight, 1)
+                loss.backward(weights)
+                optimizer.step()
+            scheduler.step()
+            print(f"=== Epoch {epoch} ===")
+
+    def fit(
+            self,
+            train: Dataset,
+            epochs=10,
+            lr=1e-3,
+            batch_size=1024,
+            weight_decay=1e-4,
+            positive_weight=5.0,
+            label_smoothing=0.0,
+            val: Dataset | torch.Tensor = None,
+            positive_threshold: float = 0.5,
+    ):
+
+        return self.fit_improved(
+            train=train,
+            epochs=epochs,
+            lr=lr,
+            batch_size=batch_size,
+            weight_decay=weight_decay,
+            positive_weight=positive_weight,
+            positive_threshold=positive_threshold
+        )
+
+
+
 class ShallowAutoencoder(nn.Module):
     """
     Shallow linear autoencoder based on the formulation:
@@ -155,15 +264,25 @@ class ShallowAutoencoder(nn.Module):
     """
 
     def __init__(
-        self, n: int, d: int, device: str = None, layer_norm=False, dropout_p=0.1
+        self, n: int, d: int, popularity: torch.Tensor, device: str = None, layer_norm=False, dropout_p=0.1, bias: bool = False,
     ):
         super().__init__()
         self.E = nn.Parameter(torch.empty(n, d))
         self.D = nn.Parameter(torch.empty(n, d))
 
+        self.bias = bias
+
+
+        if self.bias:
+           self.bias_param = nn.Parameter(torch.empty(n))
+           init.zeros_(self.bias_param)
+               # bias_init = torch.logit(popularity, eps = 1e-6)
+               # self.bias_param.copy_(bias_init)
+
         # Use Xavier (Glorot) initialization to avoid outputs hovering around 0.5
         init.xavier_uniform_(self.E)
         init.xavier_uniform_(self.D)
+
         self.dropout = nn.Dropout(p=dropout_p)
 
         # BatchNorm1d applied after the hidden layer
@@ -203,6 +322,8 @@ class ShallowAutoencoder(nn.Module):
 
         out = hidden @ self.D.t()
         out = out - (X * diag_vals)
+        if self.bias:
+            out = out + self.bias_param
         return torch.sigmoid(out)
 
     def forward_for_user(self, X):
@@ -215,6 +336,8 @@ class ShallowAutoencoder(nn.Module):
         hidden = X @ self.E
         out = hidden @ self.D.t()
         out = out - (X * diag_vals)
+        if self.bias:
+            out = out + self.bias_param
         return torch.sigmoid(out)
 
     def fit_improved(
@@ -253,16 +376,16 @@ class ShallowAutoencoder(nn.Module):
         return self.training_metrics
 
     def fit(
-        self,
-        train: Dataset,
-        epochs=10,
-        lr=1e-3,
-        batch_size=1024,
-        weight_decay=1e-4,
-        positive_weight=5.0,
-        label_smoothing=0.0,
-        val: Dataset | torch.Tensor = None,
-        positive_threshold: float = 0.5,
+            self,
+            train: Dataset,
+            epochs=10,
+            lr=1e-3,
+            batch_size=1024,
+            weight_decay=1e-4,
+            positive_weight=5.0,
+            label_smoothing=0.0,
+            val: Dataset | torch.Tensor = None,
+            positive_threshold: float = 0.5,
     ):
 
         return self.fit_improved(
@@ -426,9 +549,9 @@ class ShallowAutoencoder(nn.Module):
                         true_mask_val = (val_data_val >= 0.5).float()
                         intersection = (pred_mask_val * true_mask_val).sum()
                         union = (
-                            pred_mask_val
-                            + true_mask_val
-                            - pred_mask_val * true_mask_val
+                                pred_mask_val
+                                + true_mask_val
+                                - pred_mask_val * true_mask_val
                         ).sum()
                         iou_val_batch = intersection / (union + 1e-7)
                         val_iou_scores.append(iou_val_batch.item())
@@ -495,7 +618,7 @@ def compute_batch_ndcg(batch_data, val_data, reconstruction, k=None):
     dcg = 0.0
     for i in range(k):
         rel_i = sorted_true[i].item()
-        dcg += (2**rel_i - 1) / math.log2(i + 2)  # i+2 because log2(1+1) for first item
+        dcg += (2 ** rel_i - 1) / math.log2(i + 2)  # i+2 because log2(1+1) for first item
 
     # Calculate IDCG by sorting the true relevances in descending order
     sorted_true_ideal = torch.sort(true, descending=True).values
@@ -503,7 +626,7 @@ def compute_batch_ndcg(batch_data, val_data, reconstruction, k=None):
     idcg = 0.0
     for i in range(ideal_k):
         rel_i = sorted_true_ideal[i].item()
-        idcg += (2**rel_i - 1) / math.log2(i + 2)
+        idcg += (2 ** rel_i - 1) / math.log2(i + 2)
 
     ndcg = dcg / idcg if idcg > 0 else 0.0
     return ndcg
