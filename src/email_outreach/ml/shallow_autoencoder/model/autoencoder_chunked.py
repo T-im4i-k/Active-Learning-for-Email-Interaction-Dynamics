@@ -151,6 +151,7 @@ class DeepAutoencoder(nn.Module):
         self.encoder = nn.Sequential(
             OrderedDict([
                 ("encoder_l1", nn.Linear(in_features=n, out_features=2*d)),
+                ("encoder_dropout1", nn.Dropout(p=dropout_p)),
                 ("encoder_relu1", nn.ReLU()),
                 ("encoder_l2", nn.Linear(in_features=2*d, out_features=d))
             ])
@@ -164,6 +165,7 @@ class DeepAutoencoder(nn.Module):
         self.decoder = nn.Sequential(
             OrderedDict([
                 ("decoder_l1", nn.Linear(in_features=d, out_features=2*d)),
+                ("decoder_dropout1", nn.Dropout(p=dropout_p)),
                 ("decoder_relu1", nn.ReLU()),
                 ("decoder_l2", nn.Linear(in_features=2*d, out_features=n))
             ])
