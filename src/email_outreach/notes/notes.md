@@ -29,7 +29,7 @@ $$B_{E,D} = E D^T - diag[(E \odot D) \mathbf{1}]$$
 and $l$ is element-wise BCE loss
 
 Given the trained autoencoder, we define a function
-$f_{SAE} (x) = \sigma (x B_{E,D})$ which maps a binary vector of opened templates to a vector of probabilities of
+$f_{SAE} (x) = \sigma (x^T B_{E,D})$ which maps a binary vector of opened templates to a vector of probabilities of
 opening other templates.
 
 Additionally, we define $\Sigma = \sigma (B_{E,D})$. Note that
@@ -88,9 +88,9 @@ The model presented in the paper uses a fixed alpha coefficient
 $\alpha \in [0,1]$. We further explore the possibility of using a dynamic alpha coefficient $\alpha (t)$ that changes
 over time.
 
-The overall score $s_j (t)$ for a given user $j$ is not a measure of probability of user $j$ opening an email, but
-rather a measure of
-"usefulness" of sending an email to user $j$.
+> Note: The overall score $s_j (t)$ for a given user $j$ is not a measure of probability of user $j$ opening an email,
+> but rather a measure of
+> "usefulness" of sending an email to user $j$.
 
 ### Sent Mail - Based Alpha Scheduling
 
@@ -111,12 +111,6 @@ exploration to exploitation.
 
 Let $N (t)$ represent the number of total emails sent at time $t$ and
 $N$ - total number of emails we send overall.
-
-> **Renamed from** $m (t)$/$M$: the original draft used $m (t)$ and $M$
-> for these quantities, but $m$ is already fixed throughout this
-> document as the total recipient count (and reappears below in
-> $\tilde o = o (t)/m$). Renaming to $N (t)$/$N$ avoids that collision —
-> no formula changes here, just notation.
 
 In this context, we consider $\alpha$ to be a function of ratio
 $\mu = \frac{N (t)}{N}$. Greater fraction represents smaller window for capitalizing on information gained from
@@ -238,13 +232,11 @@ effect of multiple simultaneous openers is just the average of their individual 
 interaction between openers.
 
 We propose a refined definition of $f_j (t)$ that instead passes the full current state through the trained autoencoder
-directly, taking into consideration the combined influence of users who opened an email on user $j$ opening an email, as
-well as the influence of users who have not opened an email on user $j$ opening an email:
+directly, taking into consideration the combined influence of users who opened an email on user $j$ opening an email:
 
 $$f_j (t) = \sigma (x (t)^T B_{E,D}) e_j = f_{SAE} (x (t)) e_j$$
 
-> **Deliberately using raw** $x (t)$, not $\bar x (t)$, here. This is the
-> and the distinction matters:
+> **Deliberately using raw** $x (t)$, not $\bar x (t)$, here.
 >
 > - In the *original* $f_j (t) = \bar x (t)^T \Sigma_{:j}$ above, dividing
 >   by $n_t$ converts a sum of already-bounded, already-sigmoided
@@ -259,40 +251,33 @@ $$f_j (t) = \sigma (x (t)^T B_{E,D}) e_j = f_{SAE} (x (t)) e_j$$
 >   recipients open ($n_t$ grows), this would systematically drag
 >   $f_j (t)$ *toward maximum uncertainty* — the opposite of what more
 >   observed opens should do to confidence.
-> - $x (t)$ is also simply the more faithful input: it's defined to be
->   binary, $\{0,1\}^m$, exactly like the rows of $X$ the autoencoder
->   was trained on. $\bar x (t)$, with fractional entries like $1/n_t$,
->   is the input that's out of distribution relative to training — not
->   the other way around.
 
 Because $\sigma (\cdot)$ is nonlinear,
 $\sigma (x (t)^T B_{E,D}) \neq x (t)^T \sigma (B_{E,D}) = x (t)^T \Sigma$ in general (they coincide only when $x (t)$ is
 one-hot, i.e. exactly one opener). So $f_{SAE} (x (t))$ is a vector of probabilities of opening templates given the
 *joint* current state of opened templates $x (t)$, and the refined $f_j (t)$ represents a probability of user $j$
-opening an email given the current state of opened templates, taking into account both individual and combined
-influences of users who have opened an email.
+opening an email given the current state of opened templates, taking into account combined influences of users who have
+opened an email.
 
 # Variance-Based p Definition
 
-As was noted in previous sections, it is desirable that $p_j$ represents a measure of information gain from sending an
-email to user $j$ in terms of gaining more information about other users, given that user $j$ opens their email.
+As was noted in previous sections, it is desirable that $p_j$ represents a measure of information gain from user $j$
+opening an email in terms of gaining more information about other users.
 
-The only way this information can be utilized is a change in $f_j (t)$ scores of other users.
+The only way this information can be utilized is a change in $f$ scores of other users.
 
 However, the current definition of
 $$p_j = \frac{1}{m-1}\sum_{i=1, i\ne j}^{m} \Sigma_{j,i}$$
 is a mean of values in $\Sigma_{j:}$ among all recipients except user $j$ - thus representing an overall change of level
-of estimated $f_j (t)$ values for other users if user $j$ opens an email. This definition rewards users, who, if they
-open their email, will lead to a maximal $f_j (t)$ scores level increase, which is not consistent with the goal of
-maximizing information gain.
+of estimated $f$ values for other users if user $j$ opens an email. This definition rewards users, who, if they open
+their email, will lead to a maximal $f$ scores level increase, which is not consistent with the goal of maximizing
+information gain.
 
-The real property we want from users with high $p_j$ is not maximal increase in $f_j (t)$ scores of other users, but
-rather maximal uncertainty reduction in $f_j (t)$ scores of other users. In other words, we want to reward users who, if
-they open their email, will lead to a maximal reduction in uncertainty of $f_j (t)$ scores of other users. This is
-consistent with the goal of maximizing information gain.
+The real property we want from users with high $p_j$ is not maximal increase in $f$ scores of other users, but rather
+maximal uncertainty reduction in $f$ scores of other users.
 
-Thus, we propose a refined definition of $p_j$ that rewards maximal separation of $f_j (t)$ scores of other users if
-user $j$ opens an email, which is a measure of uncertainty reduction in $f_j (t)$ scores of other users:
+Thus, we propose a refined definition of $p_j$ that rewards maximal separation of $f$ scores of other users if user $j$
+opens an email, which is a measure of uncertainty reduction in $f$ scores of other users:
 
 $$
 p_j = \frac{4}{m-1}\sum_{i=1, i\ne j}^{m} (\Sigma_{j,i} - \bar\Sigma_{j:})^2
@@ -354,7 +339,8 @@ sections.
 # Incorporating Time-to-Open (TTO)
 
 The autoencoder is currently trained purely on $X$, the binary open/no-open matrix, which discards time-to-open (TTO)
-signal we have available. Two recipients who both eventually open a template are treated identically by the SAE, regardless of how fast they do it. Given the short operational window ($w$ between batches, $T$
+signal we have available. Two recipients who both eventually open a template are treated identically by the SAE,
+regardless of how fast they do it. Given the short operational window ($T/b$ between batches, $T$
 overall), only fast opens are actually actionable for the active learning process.
 
 ### TTO matrix and decayed label
@@ -366,8 +352,7 @@ we set $\Delta_{i,j} = +\infty$.
 Note that $\Delta$ is strictly more expressive than $X$, since $X_{i,j} = \mathbb{1}[\Delta_{i,j} < \infty]$ - i.e. $X$
 can be recovered from $\Delta$, but not vice versa.
 
-We define a decayed open label, exponential in $\Delta$ (consistent with the exponential form already used for template
-recency in the Template Weights section):
+We define a decayed open label, exponential in $\Delta$:
 
 $$Y_{i,j} = 2 ^ { (\frac{-\Delta_{i,j}}{h_\delta})}$$
 
@@ -376,69 +361,58 @@ $Y_{i,j} = 0$ for recipients who did not open. For recipients who did open, $Y_{
 slow opens rather than counting them identically to fast ones.
 
 > **Special case:** as $h_\delta \to \infty$, $Y_{i,j} \to X_{i,j}$ for every opener, recovering the original binary
-> model exactly - the same "special case" relationship used to justify the template weights generalization above.
+> model exactly.
 
 > This composes directly with the weighted $\phi_j$ from the Template Weights section, since the two decays (recency of
 > template, speed of open) are orthogonal:
 >
 > $$\phi_j = (\omega^T Y_{:j}) / \sum_{i=1}^{n} \omega_i$$
 
-### Binary-to-TTO Model: $X \to Y$
+### Binary-to-TTO Autoencoder: $X \to Y$
 
-The SAE's input space is left unchanged (binary $x$), and only the
-reconstruction target is replaced by the decayed label $Y$:
+The SAE's input space is left unchanged (binary $x$), and only the reconstruction target is replaced by the decayed
+label $Y$:
 
 $$\min_{E,D} l (Y, \sigma (X B_{E,D}))$$
 
-Since the input space is untouched, $e_j$ remains an entirely ordinary training-time input (a one-hot row is still
-exactly what a template with a single opener looks like), so $p_j$ carries over **mechanically unchanged**:
+Because the input space of the SAE does not change, definitions of $p_j (t)$ and $f_j (t)$ (we use forward-pass variant)
+carry over **mechanically unchanged**.
 
-$$p_j = \frac{1}{m-1}\sum_{i=1, i \ne j}^{m} \Sigma^{Y}_{j,i}, \quad \Sigma^Y = \sigma (B_{E,D})$$
-
-> **Interpretation shift:** $\Sigma^Y_{j,i}$ no longer represents a probability of $i$ opening given only $j$ opened -
+> **Interpretation shift:** $\Sigma_{j,i}$ no longer represents a probability of $i$ opening given only $j$ opened -
 > it now represents a TTO-decayed, "speed-weighted" version of that quantity, blending *whether* $i$ would open with
 > *how fast*. This shift propagates to $p_j$ and $f_j (t)$ as well, and ultimately to $s_j (t)$.
 
-At inference, $f_j (t)$ is computed exactly as before (the classic or forward-pass definition, either is compatible),
-using the binary $x (t)$ - no further modification to $f_j (t)$, $p_j$, or $s_j (t)$ is required to run this model
-end-to-end.
-
 ### Ideas for further research
 
-The following extensions to the TTO scheme above are natural next steps but have **not** been implemented or validated;
-we record them here rather than developing them, since there has not been time to test them in depth.
-
 - **$z (t)$ interpolation extension.** Rather than querying $f_j (t)$ on the binary $x (t)$ at inference, define a
-  partially TTO-informed state $z_j (t) = 2^{-\delta_j/h_\delta}$ for recipients who have already opened template
-  $n+1$ by time $t$ (and $0$ otherwise, where $\delta_j$ is their observed TTO), and evaluate
+  partially TTO-informed state $z_i (t) = 2^{-\delta_i/h_\delta}$ for recipients who have already opened template
+  $n+1$ by time $t$ (and $0$ otherwise, where $\delta_i$ is their observed TTO), and evaluate
   $f_j (t) = f_{SAE} (z (t)) e_j$. Since $x^T B_{E,D}$ is linear and $z (t) \in [0,1]^m$, this is a mathematically valid
   extension of a model trained on binary rows; whether the TTO of early openers carries predictive signal beyond what
   the binary $x (t)$ already provides remains to be tested.
-- **Hyperbolic decay for $Y$.** $Y_{i,j} = \kappa_\delta / (\Delta_{i,j} + \kappa_\delta)$ (mirroring the Confidence
-  Alpha Scheduling section) gives a heavier tail than the exponential decay above and would be worth comparing
-  empirically.
+- **Hyperbolic decay for $Y$.** $Y_{i,j} = \kappa_\delta / (\Delta_{i,j} + \kappa_\delta)$ gives a heavier tail than the
+  exponential decay above and would be worth comparing empirically.
 - **TTO-to-TTO model ($Y \to Y$).** Replacing the SAE's input with the continuous $Y$ as well,
   $\min_{E,D} l (Y, \sigma (Y B_{E,D}))$, would let the model see TTO on the input side too. This changes the meaning
   of $e_j$ - an instantaneous open becomes a boundary point of the input distribution rather than a typical one - so
   $p_j$ could no longer be queried at $e_j$ and would need to be re-derived, e.g. by querying $f_{SAE}$ at a recipient-
   or population-level mean TTO instead. Which choice is preferable, and whether it risks double-counting with $\phi_j$,
   has not been explored.
-- **$G$ re-calibration.** Any TTO-blended $\Sigma^Y$ shifts the numeric range/distribution of $s_j (t)$ relative to the
+- **$G$ re-calibration.** Any TTO-blended $\Sigma$ shifts the numeric range/distribution of $s_j (t)$ relative to the
   original $X$-based $\Sigma$, so the confidence modifier $G$ (tuned against the original model) likely needs re-tuning
-  under the Binary-to-TTO model, and would need it again under any of the extensions above. This has not yet been
-  checked empirically.
+  under the Binary-to-TTO model.
 
-# TTO Cutoff Thresholding
+# TTO Cutoff
 
-The original SAE described in the Recap section is trained on the full binary matrix $X$: a row $X_{i:}$ reflects every
-recipient who eventually opened template $i$, no matter how much time elapsed between sending and opening. During active
+The original SAE is trained on the full binary matrix $X$: a row $X_{i:}$ reflects every
+recipient who eventually opened template $i$, no matter how great is TTO. During active
 learning, however, the state vector $x (t)$ that the model is actually queried on is necessarily incomplete: for
 any $t < T$, a recipient who ends up opening after $t$ still shows up as a non-opener. Training rows are therefore
 "converged" patterns, while active-learning queries are "still-evolving" ones.
 
 We try to address this mismatch by censoring the SAE's training input the same way the active learning phase censors
 $x (t)$. Reusing the TTO matrix $\Delta$ from the Incorporating Time-to-Open section ($\Delta_{i,j}$ the observed
-send-to-open time, with $\Delta_{i,j} = +\infty$ for non-openers), we fix a cutoff threshold $\delta_c \in [0, +\infty)$
+time-to-open, with $\Delta_{i,j} = +\infty$ for non-openers), we fix a cutoff threshold $\delta_c \in [0, +\infty)$
 and define a thresholded binary matrix $C$:
 
 $$C_{i,j} = \mathbb{1}[\Delta_{i,j} \le \delta_c]$$
@@ -448,12 +422,6 @@ treats every slower open as a non-open - exactly the censoring a recipient's tru
 active learning. The SAE is then trained to recover the true, eventual open pattern from this censored view:
 
 $$\min_{E,D} l (X, \sigma (C B_{E,D}))$$
-
-> **Relation to the $Y$-based decay above.** The Incorporating Time-to-Open section already anticipates this
-> construction as the $h_\delta \to 0$ limit of the decayed label $Y$, turning the soft exponential discount into a
-> hard step function. The two constructions are complementary: $Y$ softly reweights the
-> *target* to reflect how informative a given open is, while $C$ hard-masks the *input* to reflect what is actually
-> visible to the model at query time.
 
 > **Choosing $\delta_c$.** As $\delta_c \to \infty$, $C \to X$ and the model reduces exactly to the original
 > formulation. At the other extreme, $\delta_c \to 0$ collapses $C$ toward the zero matrix, discarding all
@@ -467,7 +435,7 @@ $B_{E,D} = ED^T - \mathrm{diag} ([E \odot D]\mathbf{1}_m)$ is a single, fixed $m
 on $x$. Consequently, every predicted entry (before the final sigmoid) is a linear combination of the input entries -
 the model can only capture simple linear relationships between recipients.
 
-As noted in the Forward-Pass $f$ Definition section, however, neither $p_j$ nor $f_j (t)$ actually requires $\Sigma$ as
+As noted in previous sections, however, neither $p_j$ nor $f_j (t)$ actually requires $\Sigma$ as
 an explicit matrix - both are already expressible purely as forward passes through the trained autoencoder:
 
 $$
@@ -493,7 +461,7 @@ $$
 f_{DAE} (x) = (\sigma \circ \text{Decoder} \circ \text{Encoder}) (x)
 $$
 
-We optionally add dropout and/or layer normalization at the bottleneck, consistent with common regularization practice
+We optionally add dropouts after each linear layer and/or layer normalization at the bottleneck, consistent with common regularization practice
 for deeper collaborative-filtering autoencoders, to control overfitting given the added capacity relative to the
 original SAE.
 
@@ -615,20 +583,29 @@ AUC: 0.905 +- 0.009
 
 ![Variance-Based p Definition](images/variance_based_p_recalls_0_1.png)
 
-### TTO Cutoff Thresholding
+### Binary-to-TTO Autoencoder
+
+Hyperparameters selected based of grid-search: $h_{\delta} = 11520$
+
+Recalls: [0.331 0.719 0.896 0.955] +- [0.051 0.04  0.015 0.008]
+AUC: 0.877 +- 0.011
+
+![Binary-to-TTO Autoencoder](images/binary_to_tto_autoencoder_recalls_0_1.png)
+
+### TTO Cutoff
 
 Hyperparameters selected based of grid-search: $\delta_c = 720$
 
 Recalls: [0.39  0.824 0.924 0.96 ] +- [0.038 0.016 0.012 0.01 ]
 AUC: 0.895 +- 0.008
 
-![TTO Cutoff Thresholding](images/tto_cutoff_recalls_0_1.png)
+![TTO Cutoff](images/tto_cutoff_recalls_0_1.png)
 
 ### Deep Autoencoder
 
 Hyperparameters selected based of grid-search: $d=16$
 
-Recalls: [0.4   0.815 0.936 0.963] +- [0.09  0.085 0.019 0.011]
-AUC: 0.898 +- 0.019
+Recalls: [0.404 0.829 0.931 0.963] +- [0.086 0.052 0.019 0.011]
+AUC: 0.9 +- 0.017
 
 ![Deep Autoencoder](images/deep_autoencoder_recalls_0_1.png)
