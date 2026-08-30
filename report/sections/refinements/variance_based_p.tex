@@ -1,0 +1,18 @@
+\subsection{Variance-Based Definition of $p_j$}
+\label{sec:variance-p}
+
+$p_j$ is meant to reward recipients whose opening is \emph{informative}
+about others. The original definition,
+$p_j = \frac{1}{m-1}\sum_{i\ne j}\Sigma_{j,i}$, rewards recipients that
+raise the \emph{average level} of other recipients' $f$-scores --- which is
+not the same as reducing uncertainty about them. We instead reward maximal
+\emph{spread} induced across other recipients' scores:
+\begin{equation}
+\label{eq:p-variance}
+p_j = \frac{4}{m-1}\sum_{i\ne j}\big(\Sigma_{j,i} - \bar\Sigma_{j:}\big)^2,
+\qquad
+\bar\Sigma_{j:} = \frac{1}{m-1}\sum_{i\ne j}\Sigma_{j,i}.
+\end{equation}
+This is the variance of $\Sigma_{j,:}$ (excluding $j$), scaled by $4$ so
+that the maximum possible variance of a Bernoulli variable (0.25) maps to
+1, keeping $p_j \in [0,1]$.

@@ -1,0 +1,52 @@
+% =============================================================
+% preamble.tex
+% Package imports, custom macros, and document-wide settings.
+% =============================================================
+
+% --- Fonts / encoding ---------------------------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+% --- Math -----------------------------------------------------
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+
+% --- Layout / typography --------------------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage[expansion=false]{microtype} % expansion off: needs scalable fonts we don't ship
+\usepackage[english]{babel}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{bbm}
+
+% --- Tables / figures -------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{caption}
+
+% --- Bibliography / links --------------------------------------
+\usepackage{natbib}
+\usepackage[colorlinks=true, linkcolor=blue!50!black, citecolor=blue!50!black,
+            urlcolor=blue!50!black]{hyperref}
+
+% --- Custom macros ----------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\SAE}{\mathrm{SAE}}
+\newcommand{\DAE}{\mathrm{DAE}}
+
+% Short helper for the recurring "Extends:" note under the title.
+\newcommand{\extendsnote}[1]{%
+  \begin{center}
+    \begin{minipage}{0.92\textwidth}
+      \small\itshape #1
+    \end{minipage}
+  \end{center}
+  \vspace{0.5em}
+  \hrule
+  \vspace{1em}
+}

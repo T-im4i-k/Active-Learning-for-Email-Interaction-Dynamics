@@ -1,0 +1,16 @@
+\subsection{Forward-Pass Definition of $f_j(t)$}
+\label{sec:forward-f}
+
+$f_j(t) = \bar x(t)^\top\Sigma_{:j}$ is a linear combination of individual
+influences $\Sigma_{i,j}$ and therefore captures only the \emph{average}
+effect of openers, never their joint interaction. We instead pass the full
+current state through the trained network:
+\begin{equation}
+\label{eq:f-forward}
+f_j(t) = \sigma\big(x(t)^\top B_{E,D}\big)e_j = f_{\SAE}(x(t))\,e_j.
+\end{equation}
+Because $\sigma$ is nonlinear, $\sigma(x(t)^\top B_{E,D}) \ne
+x(t)^\top\sigma(B_{E,D})$ in general (equality holds only for one-hot
+$x(t)$), so Eq.~\eqref{eq:f-forward} is a genuinely different,
+jointly-conditioned probability estimate rather than a relabeling of
+Eq.~\eqref{eq:phi-p-f}.

@@ -1,0 +1,25 @@
+\subsection{Deep Autoencoder}
+\label{sec:deep-ae}
+
+$B_{E,D}$ in Eq.~\eqref{eq:phi-p-f} is a single fixed $m\times m$ matrix,
+so the SAE can only capture linear recipient--recipient relationships.
+Since $p_j$ and $f_j(t)$ (Sections~\ref{sec:forward-f}--\ref{sec:variance-p})
+already depend only on the ability to query $f_{\SAE}$, not on any explicit
+property of $B_{E,D}$, we can swap in a deeper, nonlinear network without
+changing either definition. We use a two-layer encoder/decoder with a ReLU
+nonlinearity,
+\begin{equation}
+\label{eq:deep-ae}
+\text{Encoder: Linear}(m,2d)\to\text{ReLU}\to\text{Linear}(2d,d),
+\qquad
+\text{Decoder: Linear}(d,2d)\to\text{ReLU}\to\text{Linear}(2d,m),
+\end{equation}
+giving $f_{\DAE}(x) = (\sigma\circ\text{Decoder}\circ\text{Encoder})(x)$,
+optionally with dropout and bottleneck layer normalization. A deep network
+has no single weight matrix whose diagonal can be constrained to zero; we
+substitute a denoising objective, randomly masking input entries and
+requiring reconstruction of the full unmasked $X$, forcing every prediction
+to depend on other recipients rather than a self-shortcut. Training becomes
+$\min_\theta \ell(X, f_{\DAE}(X;\theta))$, and $p_j$, $f_j(t)$ retain their
+Sections~\ref{sec:forward-f}--\ref{sec:variance-p} forms with $f_{\SAE}$
+replaced by $f_{\DAE}$.

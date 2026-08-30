@@ -1,0 +1,35 @@
+\subsection{Dynamic $\alpha$-Scheduling}
+\label{sec:alpha-scheduling}
+
+A fixed $\alpha$ ignores that the value of exploration should shrink as the
+campaign progresses. We schedule $\alpha(t)$ against two natural progress
+variables: $\mu = N(t)/N$, the fraction of the sending budget already used,
+and $\tilde o = o(t)/m$, the fraction of recipients who have already
+opened, with $o(t) = x(t)^\top\mathbf{1}$.
+
+\paragraph{Send-volume-based (function of $\mu$).}
+A \textbf{linear} schedule from $l$ to $r$,
+\begin{equation}
+\label{eq:alpha-linear}
+\alpha(\mu) = l(1-\mu) + r\mu,
+\end{equation}
+and a \textbf{geometric} (log-linear) schedule,
+\begin{equation}
+\label{eq:alpha-geometric}
+\alpha(\mu) = l^{1-\mu}\, r^{\mu}.
+\end{equation}
+
+\paragraph{Open-rate-based (function of $\tilde o$).}
+Since $f_j(t)$ is itself a point estimate that becomes more reliable as
+more opens are observed, we also consider a \textbf{confidence} schedule,
+hyperbolic in $\tilde o$:
+\begin{equation}
+\label{eq:alpha-confidence}
+\alpha(\tilde o) = \frac{\kappa}{\tilde o + \kappa},
+\end{equation}
+with dampening factor $\kappa$ (so $\alpha(\kappa)=\tfrac12$). All three
+reduce to the constant baseline at their degenerate limits ($l=r$, or
+$\kappa\to\infty$). A schedule jointly conditioned on both $\mu$ and
+$\tilde o$ is conceptually natural but is left to future work
+(Section~\ref{sec:future-work}) to avoid an unconstrained hyperparameter
+count.

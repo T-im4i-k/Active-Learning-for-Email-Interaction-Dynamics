@@ -1,0 +1,19 @@
+\subsection{Recency-Weighted Historic Rate $\phi_j$}
+\label{sec:recency-phi}
+
+The original $\phi_j$ weights every past template equally, ignoring drift
+in recipient behavior over time. Assuming templates
+$X_{1:},\dots,X_{n:}$ were sent at uniform intervals, we assign template
+$i$ an exponential weight
+\begin{equation}
+\label{eq:omega}
+\omega_i = 2^{-d_i/h}, \qquad d_i = \frac{n-i}{n},
+\end{equation}
+with half-life $h>0$, and redefine
+\begin{equation}
+\label{eq:phi-weighted}
+\phi_j = \frac{\omega^\top X_{:j}}{\sum_i \omega_i}.
+\end{equation}
+Normalizing by $\sum_i\omega_i$ keeps $\phi_j\in[0,1]$. As $h\to\infty$
+every $\omega_i\to1$, recovering the original unweighted average as a
+special case.

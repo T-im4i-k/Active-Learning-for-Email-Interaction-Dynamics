@@ -1,0 +1,88 @@
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Methodology}
+\label{sec:methodology}
+
+For each variant we grid-search its hyperparameters and select the
+configuration maximizing validation-set Recall-AUC,
+$\mathrm{AUC} = \int_0^1 \mathrm{Recall}(\tau)\,d\tau$, where
+$\mathrm{Recall}(\tau)$ is recall at sending fraction $\tau$. We report
+test-set Recall@5/15/25/35\% and Recall-AUC, mean $\pm$ std over repeated
+simulations. Before testing modifications we reproduced the original model
+on our pipeline; at the operating points reported by
+\citet{zid2025active} (25/50/75\%) our reproduction matches
+the published point estimates exactly ($0.923$, $0.975$, $0.989$), with
+larger variance attributable to fewer simulation runs.
+
+\subsection{Results}
+\label{sec:results}
+
+\begin{table}[htbp]
+\centering
+\caption{Test-set recall at four sending fractions and Recall-AUC
+(mean $\pm$ std) for each proposed refinement against the reproduced
+baseline. Hyperparameters were selected by grid search on the validation
+set.}
+\label{tab:results}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}llccccc@{}}
+\toprule
+Variant & Selected hyperparameters & Recall@5\% & Recall@15\% & Recall@25\% & Recall@35\% & AUC \\
+\midrule
+Baseline
+  & ---
+  & $0.385 \pm 0.076$ & $0.821 \pm 0.028$ & $0.923 \pm 0.014$ & $0.958 \pm 0.011$ & $0.894 \pm 0.012$ \\
+Linear $\alpha$-schedule
+  & $l=0.1,\ r=0.05$
+  & $0.383 \pm 0.073$ & $0.823 \pm 0.023$ & $0.927 \pm 0.012$ & $0.960 \pm 0.010$ & $0.894 \pm 0.011$ \\
+Geometric $\alpha$-schedule
+  & $l=0.3,\ r=0.05$
+  & $0.377 \pm 0.050$ & $0.823 \pm 0.017$ & $0.927 \pm 0.012$ & $0.959 \pm 0.010$ & $0.894 \pm 0.009$ \\
+Confidence $\alpha$-schedule
+  & $\kappa=0.003$
+  & $0.341 \pm 0.031$ & $0.818 \pm 0.022$ & $0.926 \pm 0.014$ & $0.960 \pm 0.010$ & $0.891 \pm 0.009$ \\
+Recency-weighted $\phi_j$
+  & $h=0.3$
+  & $0.447 \pm 0.041$ & $0.837 \pm 0.018$ & $0.928 \pm 0.014$ & $0.960 \pm 0.011$ & $0.903 \pm 0.009$ \\
+Forward-pass $f_j(t)$
+  & ---
+  & $0.375 \pm 0.049$ & $0.841 \pm 0.029$ & $0.937 \pm 0.018$ & $0.966 \pm 0.010$ & $0.901 \pm 0.011$ \\
+Factored $s_j(t)$
+  & $\alpha(t)$: conf., $\kappa=0.005$; $\beta(t)$: geom., $l=0.1,\ r=0.05$
+  & $0.425 \pm 0.026$ & $0.821 \pm 0.017$ & $0.922 \pm 0.013$ & $0.959 \pm 0.010$ & $0.900 \pm 0.008$ \\
+Variance-based $p_j$
+  & ---
+  & $0.479 \pm 0.034$ & $0.837 \pm 0.017$ & $0.926 \pm 0.013$ & $0.960 \pm 0.010$ & $0.905 \pm 0.009$ \\
+Binary-to-TTO autoencoder
+  & $h_\delta=11520$
+  & $0.331 \pm 0.051$ & $0.719 \pm 0.040$ & $0.896 \pm 0.015$ & $0.955 \pm 0.008$ & $0.877 \pm 0.011$ \\
+TTO cutoff
+  & $\delta_c=720$
+  & $0.390 \pm 0.038$ & $0.824 \pm 0.016$ & $0.924 \pm 0.012$ & $0.960 \pm 0.010$ & $0.895 \pm 0.008$ \\
+Deep autoencoder
+  & $d=16$
+  & $0.404 \pm 0.086$ & $0.829 \pm 0.052$ & $0.931 \pm 0.019$ & $0.963 \pm 0.011$ & $0.900 \pm 0.017$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Discussion}
+\label{sec:discussion}
+
+Gains are largest at low sending fractions and shrink as $\tau$ grows,
+since baseline recall already exceeds 0.92 by $\tau=25\%$. The
+\textbf{variance-based $p_j$} (0.479 at 5\%), \textbf{recency-weighted
+$\phi_j$} (0.447), and \textbf{factored $s_j(t)$} (0.425) give the
+largest low-fraction gains and the best AUC (0.905, 0.903, 0.900 vs.\
+0.894 baseline). The \textbf{forward-pass $f_j(t)$} shows no gain at 5\%
+but a consistent uplift from 15\% onward, suggesting nonlinear
+aggregation only helps once several recipients have opened. The
+$\alpha$-scheduling variants are largely neutral, and the
+\textbf{Binary-to-TTO autoencoder} underperforms across all quantiles.
+\textbf{TTO cutoff} gives a small, consistent uplift at no interpretive
+cost, while the \textbf{deep autoencoder} improves recall modestly but
+with markedly higher variance, suggesting the added capacity is not yet
+well-regularized. All results test one modification at a time;
+combinations are untested.

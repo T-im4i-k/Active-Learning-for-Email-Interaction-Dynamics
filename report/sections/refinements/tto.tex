@@ -1,0 +1,41 @@
+\subsection{Incorporating Time-to-Open (TTO)}
+\label{sec:tto}
+
+The SAE is trained purely on binary opens, discarding \emph{how fast} a
+recipient opened --- signal that matters given the short operational
+window ($T/b$, $T$). Let $\Delta_{i,j}\in\R_{\ge0}\cup\{+\infty\}$ be the
+observed time-to-open (with $\Delta_{i,j}=+\infty$ for non-openers, so
+$X_{i,j}=\mathbbm{1}[\Delta_{i,j}<\infty]$), and define a decayed open
+label
+\begin{equation}
+\label{eq:Y-decay}
+Y_{i,j} = 2^{-\Delta_{i,j}/h_\delta}, \qquad 2^{-\infty} := 0,
+\end{equation}
+with TTO half-life $h_\delta$; as $h_\delta\to\infty$, $Y_{i,j}\to
+X_{i,j}$ for every opener.
+
+\paragraph{Binary-to-TTO autoencoder.}
+We keep the SAE's binary input but replace the reconstruction target:
+\begin{equation}
+\label{eq:binary-to-tto}
+\min_{E,D}\ \ell\big(Y,\ \sigma(XB_{E,D})\big).
+\end{equation}
+Since the input space is unchanged, the forward-pass definitions of $p_j$
+and $f_j(t)$ (Eqs.~\eqref{eq:f-forward}--\eqref{eq:p-variance}) carry over
+mechanically; only their interpretation shifts --- $\Sigma_{j,i}$ now
+blends \emph{whether} $i$ opens with \emph{how fast}.
+
+\paragraph{TTO cutoff.}
+Training rows of $X$ reflect the \emph{eventual} open pattern, while
+active-learning queries $x(t)$ are necessarily censored at $t < T$. We
+instead censor the training input itself, fixing a cutoff $\delta_c$ and
+defining $C_{i,j} = \mathbbm{1}[\Delta_{i,j}\le\delta_c]$, then training
+\begin{equation}
+\label{eq:tto-cutoff}
+\min_{E,D}\ \ell\big(X,\ \sigma(CB_{E,D})\big).
+\end{equation}
+$C$ retains only opens fast enough to plausibly be observed within an
+active operational window and treats slower opens as non-opens during
+training --- matching the censoring recipients are actually subject to
+during active learning. As $\delta_c\to\infty$, $C\to X$, recovering the
+original model.
