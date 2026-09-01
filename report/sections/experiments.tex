@@ -15,6 +15,7 @@ on our pipeline; at the operating points reported by
 the published point estimates exactly ($0.923$, $0.975$, $0.989$), with
 larger variance attributable to fewer simulation runs.
 
+\newpage
 \subsection{Results}
 \label{sec:results}
 
@@ -75,10 +76,10 @@ Gains are largest at low sending fractions and shrink as $\tau$ grows,
 since baseline recall already exceeds 0.92 by $\tau=25\%$. The
 \textbf{variance-based $p_j$} (0.479 at 5\%), \textbf{recency-weighted
 $\phi_j$} (0.447), and \textbf{factored $s_j(t)$} (0.425) give the
-largest low-fraction gains and the best AUC (0.905, 0.903, 0.900 vs.\
+largest low-fraction gains and some of the highest AUC (0.905, 0.903, 0.900 vs.\
 0.894 baseline). The \textbf{forward-pass $f_j(t)$} shows no gain at 5\%
 but a consistent uplift from 15\% onward, suggesting nonlinear
-aggregation only helps once several recipients have opened. The
+aggregation only helps once significant number of recipients have opened. The
 $\alpha$-scheduling variants are largely neutral, and the
 \textbf{Binary-to-TTO autoencoder} underperforms across all quantiles.
 \textbf{TTO cutoff} gives a small, consistent uplift at no interpretive

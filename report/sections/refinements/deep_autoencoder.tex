@@ -3,16 +3,15 @@
 
 $B_{E,D}$ in Eq.~\eqref{eq:phi-p-f} is a single fixed $m\times m$ matrix,
 so the SAE can only capture linear recipient--recipient relationships.
-Since $p_j$ and $f_j(t)$ (Sections~\ref{sec:forward-f}--\ref{sec:variance-p})
-already depend only on the ability to query $f_{\SAE}$, not on any explicit
+Since $p_j$ and $f_j(t)$ depend only on the ability to query $f_{\SAE}$, not on any explicit
 property of $B_{E,D}$, we can swap in a deeper, nonlinear network without
 changing either definition. We use a two-layer encoder/decoder with a ReLU
 nonlinearity,
 \begin{equation}
 \label{eq:deep-ae}
-\text{Encoder: Linear}(m,2d)\to\text{ReLU}\to\text{Linear}(2d,d),
+\text{Encoder: Lin}(m,2d)\to\text{ReLU}\to\text{Lin}(2d,d),
 \qquad
-\text{Decoder: Linear}(d,2d)\to\text{ReLU}\to\text{Linear}(2d,m),
+\text{Decoder: Lin}(d,2d)\to\text{ReLU}\to\text{Lin}(2d,m).
 \end{equation}
 giving $f_{\DAE}(x) = (\sigma\circ\text{Decoder}\circ\text{Encoder})(x)$,
 optionally with dropout and bottleneck layer normalization. A deep network
