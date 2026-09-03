@@ -2,18 +2,23 @@
 \label{sec:alpha-scheduling}
 
 A fixed $\alpha$ ignores that the value of exploration should shrink as the
-campaign progresses. We schedule $\alpha(t)$ against two natural progress
+campaign progresses, echoing the broader practice of decaying exploration
+coefficients over time in the bandit and reinforcement-learning literature
+\citep{auer2002finite}. We schedule $\alpha(t)$ against two natural progress
 variables: $\mu = N(t)/N$, the fraction of the sending budget already used,
 and $\tilde o = o(t)/m$, the fraction of recipients who have already
 opened, with $o(t) = x(t)^\top\mathbf{1}$.
 
 \paragraph{Send-volume-based (function of $\mu$).}
-A \textbf{linear} schedule from $l$ to $r$,
+A \textbf{linear} schedule from $l$ to $r$, in the spirit of the linearly
+annealed $\varepsilon$-greedy exploration rate used to train DQN agents
+\citep{mnih2015human},
 \begin{equation}
 \label{eq:alpha-linear}
 \alpha(\mu) = l(1-\mu) + r\mu,
 \end{equation}
-and a \textbf{geometric} (log-linear) schedule,
+and a \textbf{geometric} (log-linear) schedule, analogous to the geometric
+cooling schedules of simulated annealing \citep{kirkpatrick1983optimization},
 \begin{equation}
 \label{eq:alpha-geometric}
 \alpha(\mu) = l^{1-\mu}\, r^{\mu}.
@@ -22,7 +27,9 @@ and a \textbf{geometric} (log-linear) schedule,
 \paragraph{Open-rate-based (function of $\tilde o$).}
 Since $f_j(t)$ is itself a point estimate that becomes more reliable as
 more opens are observed, we also consider a \textbf{confidence} schedule,
-hyperbolic in $\tilde o$:
+hyperbolic in $\tilde o$ --- paralleling how the confidence radius of
+UCB-style bandit policies shrinks as observations accumulate
+\citep{auer2002finite}:
 \begin{equation}
 \label{eq:alpha-confidence}
 \alpha(\tilde o) = \frac{\kappa}{\tilde o + \kappa},

@@ -6,7 +6,9 @@ so the SAE can only capture linear recipient--recipient relationships.
 Since $p_j$ and $f_j(t)$ depend only on the ability to query $f_{\SAE}$, not on any explicit
 property of $B_{E,D}$, we can swap in a deeper, nonlinear network without
 changing either definition. We use a two-layer encoder/decoder with a ReLU
-nonlinearity,
+nonlinearity, following the deep collaborative-filtering autoencoders of
+\citet{kuchaiev2017training}, which were shown to generalize better than
+their shallow counterparts,
 \begin{equation}
 \label{eq:deep-ae}
 \text{Encoder: Lin}(m,2d)\to\text{ReLU}\to\text{Lin}(2d,d),
@@ -14,11 +16,14 @@ nonlinearity,
 \text{Decoder: Lin}(d,2d)\to\text{ReLU}\to\text{Lin}(2d,m).
 \end{equation}
 giving $f_{\DAE}(x) = (\sigma\circ\text{Decoder}\circ\text{Encoder})(x)$,
-optionally with dropout and bottleneck layer normalization. A deep network
-has no single weight matrix whose diagonal can be constrained to zero; we
-substitute a denoising objective, randomly masking input entries and
-requiring reconstruction of the full unmasked $X$, forcing every prediction
-to depend on other recipients rather than a self-shortcut. Training becomes
+optionally with dropout \citep{srivastava2014dropout} and bottleneck layer
+normalization. A deep network has no single weight matrix whose diagonal
+can be constrained to zero; we substitute a denoising objective
+\citep{vincent2008extracting}, randomly masking input entries and
+requiring reconstruction of the full unmasked $X$ --- as in collaborative
+denoising autoencoders for top-N recommendation \citep{wu2016collaborative}
+--- forcing every prediction to depend on other recipients rather than a
+self-shortcut. Training becomes
 $\min_\theta \ell(X, f_{\DAE}(X;\theta))$, and $p_j$, $f_j(t)$ retain their
 Sections~\ref{sec:forward-f}--\ref{sec:variance-p} forms with $f_{\SAE}$
 replaced by $f_{\DAE}$.

@@ -4,7 +4,9 @@
 $f_j(t) = \bar x(t)^\top\Sigma_{:j}$ is a linear combination of individual
 influences $\Sigma_{i,j}$ and therefore captures only the \emph{average}
 effect of openers, never their joint interaction. We instead pass the full
-current state through the trained network:
+current state through the trained network, in the spirit of nonlinear
+autoencoder-based collaborative-filtering predictors such as AutoRec
+\citep{sedhain2015autorec}:
 \begin{equation}
 \label{eq:f-forward}
 f_j(t) = \sigma\big(x(t)^\top B_{E,D}\big)e_j = f_{\SAE}(x(t))\,e_j.

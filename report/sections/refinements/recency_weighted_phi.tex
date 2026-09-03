@@ -2,9 +2,12 @@
 \label{sec:recency-phi}
 
 The original $\phi_j$ weights every past template equally, ignoring drift
-in recipient behavior over time. Assuming templates
+in recipient behavior over time --- a limitation well studied in
+time-aware collaborative filtering \citep{ding2005time,koren2009collaborative}.
+Assuming templates
 $X_{1:},\dots,X_{n:}$ were sent at uniform intervals, we assign template
-$i$ an exponential weight
+$i$ an exponential weight, following the time-weighting scheme of
+\citet{ding2005time},
 \begin{equation}
 \label{eq:omega}
 \omega_i = 2^{-d_i/h}, \qquad d_i = \frac{n-i}{n},

@@ -2,11 +2,14 @@
 \label{sec:variance-p}
 
 $p_j$ is meant to reward recipients whose opening is \emph{informative}
-about others. The original definition,
+about others, in the sense of informativeness used throughout active
+learning \citep{settles2009active}. The original definition,
 $p_j = \frac{1}{m-1}\sum_{i\ne j}\Sigma_{j,i}$, rewards recipients that
 raise the \emph{average level} of other recipients' $f$-scores --- which is
 not the same as reducing uncertainty about them. We instead reward maximal
-\emph{spread} induced across other recipients' scores:
+\emph{spread} induced across other recipients' scores, following
+variance-based exploration bonuses in the multi-armed bandit literature
+\citep{audibert2009exploration}:
 \begin{equation}
 \label{eq:p-variance}
 p_j = \frac{4}{m-1}\sum_{i\ne j}\big(\Sigma_{j,i} - \bar\Sigma_{j:}\big)^2,
