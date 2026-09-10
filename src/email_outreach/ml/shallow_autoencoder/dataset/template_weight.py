@@ -37,14 +37,15 @@ class UniformTemplateWeight(AbstractTemplateWeight):
 class TemplateWeightFactory:
     @classmethod
     def from_config(cls, config: dict) -> AbstractTemplateWeight:
-        template_weight: str = config["template_weight"]
+        template_weight_params = config["template_weight_params"]
+        template_weight_type: str = template_weight_params["type"].lower()
 
-        match template_weight:
+        match template_weight_type:
             case "uniform":
                 return UniformTemplateWeight(min_template_id=config["min_template_id"],max_template_id=config["max_template_id"])
             case "exponential":
                 return ExponentialTemplateWeight(
                     min_template_id=config["min_template_id"],
                     max_template_id=config["max_template_id"],
-                    half_life=config["template_weight_params"]["half_life"]
+                    half_life=template_weight_params["half_life"]
                 )

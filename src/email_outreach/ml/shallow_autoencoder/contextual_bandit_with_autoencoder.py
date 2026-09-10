@@ -30,10 +30,13 @@ from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
 from email_outreach.ml.shallow_autoencoder.coef_scheduler import AbstractCoefScheduler, CoefSchedulerArgs, \
     AlphaSchedulerFactory, BetaSchedulerFactory
 from email_outreach.ml.shallow_autoencoder.dataset.template_weight import AbstractTemplateWeight, TemplateWeightFactory
-from email_outreach.ml.shallow_autoencoder.dataset.tto_autoencoder_dataset import BinaryToTTOAutoencoderDataset
+from email_outreach.ml.shallow_autoencoder.dataset.tto_autoencoder_dataset import BinaryToTTOAutoencoderDataset, \
+    TTOToTTOAutoencoderDataset
 from email_outreach.ml.shallow_autoencoder.dataset.tto_decay import TTODecayFactory, AbstractTTODecay
 from email_outreach.ml.shallow_autoencoder.dataset.cutoff_dataset import CutoffDataset
 from email_outreach.ml.shallow_autoencoder.dataset.noisy_dataset import NoisyDataset
+
+from typing import Any
 # from email_outreach.ml.shallow_autoencoder.dataset.time_masked_autoencoder_dataset import TimeMaskedAutoencoderDataset
 
 
@@ -48,12 +51,9 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
     wd: float = 0.0001
     batch_size: int = 16
     positive_weight: float = 100.0
-    alpha_type: str = "constant"
-    alpha_params: dict[str, float] = field(default_factory=lambda: {"alpha": 0.1})
-    beta_type: str | None = None
-    beta_params: dict[str, float] = field(default_factory=lambda: {})
-    template_weight: str = "uniform"
-    template_weight_params: dict[str, float] = field(default_factory=lambda: {})
+    alpha_params: dict[str, Any] = field(default_factory=lambda: {"type": "constant", "alpha": 0.1})
+    beta_params: dict[str, Any] = field(default_factory=lambda: {})
+    template_weight_params: dict[str, Any] = field(default_factory=lambda: {"type": "uniform"})
     G: float = 10000.0
     layer_norm: bool = True
     naive_f: bool = True
@@ -66,12 +66,13 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
     dropout: float = 0.0
     flipped: bool = False
     p_type: Literal["mean", "var", "std"] = "mean"
-    autoencoder_type: Literal["original","binary_to_tto", "tto_to_tto", "cutoff", "noisy"] = "original"
+    autoencoder_type: Literal["original", "binary_to_tto", "tto_to_tto", "cutoff", "noisy"] = "original"
     tto_decay: dict = field(default_factory=lambda: {})
-    cutoff: float| None = None
+    cutoff: float | None = None
     noise_params: dict = field(default_factory=lambda: {})
     deep_autoencoder: bool = False
     sae_bias: bool = False
+    p_time: bool = False
 
     def to_dict(self):
         return {
@@ -81,11 +82,8 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "wd": self.wd,
             "batch_size": self.batch_size,
             "positive_weight": self.positive_weight,
-            "alpha_type": self.alpha_type,
             "alpha_params": self.alpha_params,
-            "beta_type": self.beta_type,
             "beta_params": self.beta_params,
-            "template_weight": self.template_weight,
             "template_weight_params": self.template_weight_params,
             "G": self.G,
             "layer_norm": self.layer_norm,
@@ -104,7 +102,8 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "cutoff": self.cutoff,
             "noise_params": self.noise_params,
             "deep_autoencoder": self.deep_autoencoder,
-            "sae_bias": self.sae_bias
+            "sae_bias": self.sae_bias,
+            "p_time": self.p_time
         }
 
     @classmethod
@@ -181,12 +180,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                     raise ValueError("TTO Decay must be provided")
 
                 train_dataset = BinaryToTTOAutoencoderDataset(
-                    autoencoder_dataset = train_dataset,
-                    tto_decay = self.tto_decay
+                    autoencoder_dataset=train_dataset,
+                    tto_decay=self.tto_decay
                 )
                 val_dataset = BinaryToTTOAutoencoderDataset(
-                    autoencoder_dataset = val_dataset,
-                    tto_decay = self.tto_decay
+                    autoencoder_dataset=val_dataset,
+                    tto_decay=self.tto_decay
                 )
 
                 positive_threshold = 0.0
@@ -197,26 +196,26 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                     raise ValueError("Cutoff must be provided")
 
                 train_dataset = CutoffDataset(
-                    autoencoder_dataset = train_dataset,
-                    cutoff_minutes = self.config.cutoff
+                    autoencoder_dataset=train_dataset,
+                    cutoff_minutes=self.config.cutoff
                 )
                 val_dataset = CutoffDataset(
-                    autoencoder_dataset = val_dataset,
-                    cutoff_minutes = self.config.cutoff
+                    autoencoder_dataset=val_dataset,
+                    cutoff_minutes=self.config.cutoff
                 )
             case "noisy":
                 if len(self.config.noise_params) == 0:
                     raise ValueError("No noise parameters provided")
 
                 train_dataset = NoisyDataset(
-                    autoencoder_dataset = train_dataset,
-                    p_min = self.config.noise_params["p_min"],
-                    p_max = self.config.noise_params["p_max"],
+                    autoencoder_dataset=train_dataset,
+                    p_min=self.config.noise_params["p_min"],
+                    p_max=self.config.noise_params["p_max"],
                 )
                 val_dataset = NoisyDataset(
-                    autoencoder_dataset = val_dataset,
-                    p_min = self.config.noise_params["p_min"],
-                    p_max = self.config.noise_params["p_max"],
+                    autoencoder_dataset=val_dataset,
+                    p_min=self.config.noise_params["p_min"],
+                    p_max=self.config.noise_params["p_max"],
                 )
 
             case _:
@@ -249,7 +248,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             weight_decay=self.config.wd,
             positive_weight=self.config.positive_weight,
             val=val_dataset,
-            positive_threshold = positive_threshold
+            positive_threshold=positive_threshold
         )
         # TrainingMetrics.plot_average_ndcg(self.autoencoder.training_metrics)
         # TrainingMetrics.plot_f1_score(self.autoencoder.training_metrics)
@@ -376,7 +375,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         # Calculate p, f, s
         fs: torch.tensor = self.calculate_f(opened, newly_opened) if self.config.naive_f else self.non_naive_f(opened)
         if self.last_p.sum() == 0:
-            ps: torch.tensor = self.calculate_p()
+            ps: torch.tensor = self.calculate_p(opened) if not self.config.p_time else self.calculate_time_p(opened)
             self.last_p = ps
         else:
             ps: torch.tensor = self.last_p
@@ -481,7 +480,52 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             self._popularity_tensor = self.train.popularity_tensor(self._template_weight)
         return self._popularity_tensor
 
-    def calculate_p(self) -> torch.tensor:
+    def calculate_time_p(self, results: torch.Tensor) -> torch.Tensor:
+        # logger.info("Calculating p")
+        batch_size = 100
+        input_dim = self.train.num_users
+        x_t = results  # x(t): current observed interaction vector for template n+1
+
+        # Baseline forward pass f_SAE(x(t)), computed once and reused for every j
+        baseline = self.autoencoder.predict(x_t.unsqueeze(0))  # shape (1, input_dim)
+
+        all_averages = []
+        all_variances = []
+        for start in range(0, input_dim, batch_size):
+            end = min(start + batch_size, input_dim)
+            # Build x_{+j}(t) for each j in [start, end): x(t) with entry j forced to 1
+            users = x_t.unsqueeze(0).repeat(end - start, 1)
+            for i in range(start, end):
+                users[i - start, i] = 1
+            preds = self.autoencoder.predict(users)
+
+            # delta_{j,:} = f_SAE(x_{+j}(t)) - f_SAE(x(t)) -- marginal uplift from j opening
+            deltas = preds - baseline
+
+            # Remove self-contribution by zeroing the diagonal
+            no_self_deltas = deltas.clone()
+            for i in range(start, end):
+                no_self_deltas[i - start, i] = 0
+
+            # Calculate the average and variance of the uplift
+            averages = no_self_deltas.mean(dim=1)
+            variances = no_self_deltas.var(dim=1)
+            all_averages.append(averages)
+            all_variances.append(variances)
+
+        all_averages = torch.cat(all_averages)
+        all_variances = torch.cat(all_variances)
+        match self.config.p_type:
+            # case "mean":
+            #     return all_averages
+            case "var":
+                return all_variances
+            case "std":
+                return torch.sqrt(all_variances)
+            case _:
+                raise ValueError("Unknown p value")
+
+    def calculate_p(self, results: torch.Tensor) -> torch.Tensor:
         # logger.info("Calculating p")
         batch_size = 100
         input_dim = self.train.num_users
@@ -491,13 +535,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             end = min(start + batch_size, input_dim)
             users = torch.zeros(end - start, input_dim)
             for i in range(start, end):
-                users[i - start, i] = 1  # train.average_opens
-            if self.config.layer_norm:
-                preds = self.autoencoder.predict(users)
-            else:
-                preds = self.autoencoder.predict_for_user(users)
-
-            # Remove self-contribution by zeroing the diagonal
+                users[i - start, i] = 1
+            preds = self.autoencoder.predict(users)
+            # Remove slf-contribution by zeroing the diagonal
             no_self_users = preds.clone()
             for i in range(start, end):
                 no_self_users[i - start, i] = 0
@@ -510,20 +550,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         all_averages = torch.cat(all_averages)
         all_variances = torch.cat(all_variances)
-        # Show only values of true opens
-        if self.show_plots:
-            plt.hist(all_averages.detach().numpy().flatten(), bins=100, color="blue")
-            true_opens: torch.Tensor = self.val.tensor_of_opens_of_mailshot(
-                self.current_mailshot
-            )
-            averages_of_trues = all_averages[true_opens == 1]
-            plt.hist(
-                averages_of_trues.detach().numpy().flatten(), bins=100, color="orange"
-            )
-            plt.title("Histogram of p")
-            plt.show()
-        # Fill the averages to the input_dim size
-        # return torch.ones(all_averages.shape) - all_averages
         match self.config.p_type:
             case "mean":
                 return all_averages

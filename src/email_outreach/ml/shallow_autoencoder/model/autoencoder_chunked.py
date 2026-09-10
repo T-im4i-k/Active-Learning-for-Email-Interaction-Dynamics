@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 from email_outreach.utils.common_utils import set_seed
 
 from typing import OrderedDict
-
+import numpy as np
 # References:
 # - Sedhain S. et al., "AutoRec: Autoencoders Meet Collaborative Filtering," WWW 2015.
 #   https://arxiv.org/abs/1508.01195
@@ -393,6 +393,7 @@ class ShallowAutoencoder(nn.Module):
     def fit_improved(
             self,
             train: Dataset,
+            val: Dataset,
             epochs,
             lr,
             batch_size,
@@ -400,7 +401,6 @@ class ShallowAutoencoder(nn.Module):
             positive_weight,
             positive_threshold,
     ):
-        set_seed(42)
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
         optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
@@ -440,6 +440,7 @@ class ShallowAutoencoder(nn.Module):
 
         return self.fit_improved(
             train=train,
+            val=val,
             epochs=epochs,
             lr=lr,
             batch_size=batch_size,
@@ -447,184 +448,6 @@ class ShallowAutoencoder(nn.Module):
             positive_weight=positive_weight,
             positive_threshold=positive_threshold
         )
-
-        """
-        Trains the model on the given dataset X and calculates validation IoU if a validation set is provided.
-        IoU calculation reference (Jaccard index): https://en.wikipedia.org/wiki/Jaccard_index
-        """
-        set_seed(42)
-        train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
-
-        if val is not None:
-            if isinstance(val, torch.Tensor):
-                val = TensorDataset(val)
-            val_loader = DataLoader(val, batch_size=batch_size, shuffle=False)
-        else:
-            val_loader = None
-
-        self.to(self.device)
-        optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
-        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
-        # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=6e-5)
-
-        criterion = nn.BCELoss(reduction="none")
-        for epoch in range(epochs):
-            self.train()
-            train_loss = 0.0
-            training_ndcg = 0.0
-            for batch_data, target_data in train_loader:
-                batch_data = batch_data.to(self.device)
-                optimizer.zero_grad()
-
-                reconstruction = self.forward(batch_data)
-
-                target = (
-                    target_data * (1 - label_smoothing)
-                    + (1 - target_data) * label_smoothing
-                    if label_smoothing > 0
-                    else batch_data
-                )
-                loss = criterion(reconstruction, target)
-                # print(loss.shape)
-
-                # Weighted loss
-                weights = torch.where(batch_data > positive_threshold, positive_weight, 1)
-                mask = target_data - batch_data
-                weights_unseen_data = torch.where(mask > 0.5, 0.5, 0)
-                weights = weights + weights_unseen_data
-                loss.backward(weights)
-
-                # Uncomment this if you want to use weighted loss
-                # weighted_loss = (loss * weights).mean()
-                # weighted_loss.backward()
-                # This is where you clip gradients before taking the optimizer step
-                # clip_grad_norm_(self.parameters(), max_norm=1.0)
-                optimizer.step()
-
-                with torch.no_grad():
-                    ndcg_batch = compute_batch_ndcg(
-                        batch_data, target_data, reconstruction, k=1000
-                    )
-                    training_ndcg += ndcg_batch * batch_data.size(0)
-
-                train_loss += loss.mean() * batch_data.size(0)
-            scheduler.step()
-            avg_train_ndcg = training_ndcg / len(train_loader.dataset)
-            avg_train_loss = train_loss / len(train_loader.dataset)
-
-            # Validation 1 - NDCG on masked entries of training set
-            if epoch % 1 == 0:
-                self.eval()
-                total_ndcg = 0.0
-                total_items = 0
-                f1_scores = []
-                num_batches = 0
-                with torch.no_grad():
-                    for batch_data, val_data in train_loader:
-                        # NDCG
-                        batch_data, val_data = batch_data.to(self.device), val_data.to(
-                            self.device
-                        )
-                        reconstruction = self.forward(batch_data)
-                        ndcg_batch = compute_batch_ndcg(
-                            batch_data, val_data, reconstruction, k=1000
-                        )
-                        total_ndcg += ndcg_batch * batch_data.size(0)
-                        total_items += batch_data.size(0)
-                        num_batches += 1
-                        # Compute F1 using scikit-learn
-                        f1 = compute_batch_f1(
-                            batch_data, val_data, reconstruction, threshold=0.5
-                        )
-                        f1_scores.append(f1)
-
-                average_ndcg = total_ndcg / total_items if total_items > 0 else 0.0
-                average_f1 = sum(f1_scores) / len(f1_scores) if f1_scores else 0.0
-                evaluation_metrics = TrainingMetrics(
-                    avg_train_loss,
-                    avg_train_ndcg,
-                    average_ndcg,
-                    average_f1,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-                self.training_metrics.append(evaluation_metrics)
-
-            # Validation 2 - NDCG on validation set
-            if val_loader is not None and epoch % 1 == 0:
-                self.eval()
-                val_loss = 0.0
-                val_total_ndcg = 0.0
-                val_total_items = 0
-                val_f1_scores = []
-                val_iou_scores = []
-                with torch.no_grad():
-                    for batch_data_val, val_data_val in val_loader:
-                        batch_data_val = batch_data_val.to(self.device)
-                        val_data_val = val_data_val.to(self.device)
-
-                        # Forward pass
-                        reconstruction_val = self.forward(batch_data_val)
-
-                        # Validation loss (weighted, similar to training)
-                        loss_val = criterion(reconstruction_val, val_data_val)
-                        weights_val = torch.where(
-                            val_data_val > 0.5, positive_weight, 1.0
-                        )
-                        weighted_loss_val = (loss_val * weights_val).mean()
-                        val_loss += weighted_loss_val * batch_data_val.size(0)
-
-                        # NDCG
-                        ndcg_val_batch = compute_batch_ndcg(
-                            batch_data_val, val_data_val, reconstruction_val, k=1000
-                        )
-                        val_total_ndcg += ndcg_val_batch * batch_data_val.size(0)
-
-                        # F1
-                        f1_val_batch = compute_batch_f1(
-                            batch_data_val,
-                            val_data_val,
-                            reconstruction_val,
-                            threshold=0.5,
-                        )
-                        val_f1_scores.append(f1_val_batch)
-
-                        # IoU (Jaccard Index)
-                        # Simple example: predictions above threshold 0.5
-                        pred_mask_val = (reconstruction_val >= 0.5).float()
-                        true_mask_val = (val_data_val >= 0.5).float()
-                        intersection = (pred_mask_val * true_mask_val).sum()
-                        union = (
-                                pred_mask_val
-                                + true_mask_val
-                                - pred_mask_val * true_mask_val
-                        ).sum()
-                        iou_val_batch = intersection / (union + 1e-7)
-                        val_iou_scores.append(iou_val_batch.item())
-
-                        val_total_items += batch_data_val.size(0)
-
-                average_val_loss = val_loss / len(val_loader.dataset)
-                average_val_ndcg = (
-                    val_total_ndcg / val_total_items if val_total_items > 0 else 0.0
-                )
-                average_val_f1 = (
-                    sum(val_f1_scores) / len(val_f1_scores) if val_f1_scores else 0.0
-                )
-                average_val_iou = (
-                    sum(val_iou_scores) / len(val_iou_scores) if val_iou_scores else 0.0
-                )
-                self.training_metrics[-1].val_loss = average_val_loss
-                self.training_metrics[-1].val_average_ndcg = average_val_ndcg
-                self.training_metrics[-1].val_average_f1 = average_val_f1
-                self.training_metrics[-1].val_average_iou = average_val_iou
-                print(f"Epoch {epoch}: {self.training_metrics[-1]}")
-
-        return self.training_metrics
 
     def predict(self, X):
         self.eval()

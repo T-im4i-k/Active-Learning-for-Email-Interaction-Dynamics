@@ -93,8 +93,8 @@ class AbstractSchedulerFactory(ABC):
 class AlphaSchedulerFactory(AbstractSchedulerFactory):
     @classmethod
     def from_config(cls, config: dict) -> AbstractCoefScheduler:
-        scheduler_type: str = config["alpha_type"].lower()
         alpha_params: dict = config["alpha_params"]
+        scheduler_type: str = alpha_params["type"].lower()
 
         normal_batch_size = config["sent_by_T"] / config["num_splits"]
         batch_sizes: Sequence[float] = [normal_batch_size] * config["num_splits"] + [config["sent_after_T"]]
@@ -125,11 +125,11 @@ class AlphaSchedulerFactory(AbstractSchedulerFactory):
 class BetaSchedulerFactory(AbstractSchedulerFactory):
     @classmethod
     def from_config(cls, config: dict) -> AbstractCoefScheduler | None:
-        if config["beta_type"] is None:
+        if not config["beta_params"]:
             return None
 
-        scheduler_type: str = config["beta_type"].lower()
         beta_params: dict = config["beta_params"]
+        scheduler_type: str = beta_params["type"].lower()
 
         normal_batch_size = config["sent_by_T"] / config["num_splits"]
         batch_sizes: Sequence[float] = [normal_batch_size] * config["num_splits"] + [config["sent_after_T"]]
