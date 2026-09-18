@@ -1,0 +1,98 @@
+\documentclass[a4paper,fleqn]{cas-dc}
+
+\usepackage[authoryear,longnamesfirst]{natbib}
+
+% --- Additional packages not already provided by cas-dc ---
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\providecommand{\mathbbm}[1]{\mathbb{#1}}
+
+% --- Custom macros (carried over from the original preamble) ---
+\newcommand{\R}{\mathbb{R}}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\SAE}{\mathrm{SAE}}
+\newcommand{\DAE}{\mathrm{DAE}}
+
+% Short helper for the recurring "Extends:" note under the title.
+\newcommand{\extendsnote}[1]{%
+  \par\noindent\small\itshape #1\par\vspace{0.5em}
+}
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+% Short title
+\shorttitle{Refinements to the SAE--Thompson Sampling Framework}
+
+% Short author
+\shortauthors{Ivanov Tymofii}
+
+% Main title of the paper
+\title[mode=title]{Refinements to the SAE--Thompson Sampling Framework for Active Email Outreach}
+
+% First author
+\author[1]{Ivanov Tymofii}
+
+% Address/affiliation
+\affiliation[1]{organization={FIT CTU},
+            addressline={},
+            city={},
+            postcode={},
+            state={},
+            country={}}
+
+% Here goes the abstract
+\begin{abstract}
+This paper extends the SAE--Thompson Sampling framework of
+\citet{zid2025active} for cold-start recipient selection in active email
+outreach. Several components of the original model --- a fixed
+exploration/exploitation coefficient, an unweighted historic open rate, a
+linear aggregation for the current-state confidence term, training on
+binary labels only, and a shallow autoencoder architecture --- were fixed
+by the original authors for simplicity. We revisit each of these choices
+and propose concrete, mathematically grounded refinements, and report
+experimental results for each proposal against a reproduced baseline.
+\end{abstract}
+
+% Research highlights
+\begin{highlights}
+\item Extends the SAE--Thompson Sampling framework for active email outreach of \citet{zid2025active}.
+\item Proposes dynamic $\alpha$-scheduling, a recency-weighted historic open rate, a nonlinear forward-pass confidence term, a variance-based influence score, a factored score function, time-to-open signal, and a deep autoencoder.
+\item Reports experimental results for each proposal against a reproduced baseline.
+\end{highlights}
+
+% Keywords
+\begin{keywords}
+Thompson Sampling \sep Active Learning \sep Autoencoders \sep Email Outreach \sep Multi-Armed Bandits
+\end{keywords}
+
+\maketitle
+
+\extendsnote{%
+  \emph{Extends:} \v{Z}id, \v{C}., Alves, R., and Kord\'ik, P.\ 2025.
+  \emph{Active Recommendation for Email Outreach Dynamics.} In
+  \emph{Proceedings of the 34th ACM International Conference on Information
+  and Knowledge Management (CIKM~'25)}, Seoul, Republic of Korea.\
+  \url{https://doi.org/10.1145/3746252.3760832}
+}
+
+\input{sections/introduction}
+\input{sections/recap}
+\input{sections/refinements}
+\input{sections/experiments}
+\input{sections/future_work}
+
+% To print the credit authorship contribution details
+\printcredits
+
+%% Loading bibliography style file
+\bibliographystyle{cas-model2-names}
+
+% Loading bibliography database
+\bibliography{references}
+
+\end{document}

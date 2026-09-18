@@ -1,0 +1,9 @@
+This paper extends the SAE--Thompson Sampling framework of
+\citet{zid2025active} for cold-start recipient selection in active email
+outreach. Several components of the original model --- a fixed
+exploration/exploitation coefficient, an unweighted historic open rate, a
+linear aggregation for the current-state confidence term, training on
+binary labels only, and a shallow autoencoder architecture --- were fixed
+by the original authors for simplicity. We revisit each of these choices
+and propose concrete, mathematically grounded refinements, and report
+experimental results for each proposal against a reproduced baseline.

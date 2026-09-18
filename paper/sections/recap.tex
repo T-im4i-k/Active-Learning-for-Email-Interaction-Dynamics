@@ -1,0 +1,48 @@
+\section{Recap of the Original Model}
+\label{sec:recap}
+
+\paragraph{Setup.}
+We observe $X \in \{0,1\}^{n \times m}$, where $n$ is the number of
+templates, $m$ the number of recipients, and $X_{i,j}=1$ if recipient $j$
+opened template $i$. For a new template $n{+}1$, sent over $b$ batches
+within a deadline $T$, the model selects at each batch a small subset of
+recipients so as to maximize eventual openers reached early.
+
+\paragraph{Shallow autoencoder.}
+A SAE with encoder/decoder $E, D \in \R^{m\times d}$ is trained as
+\begin{equation*}
+\min_{E,D} \ell\big(X,\ \sigma(XB_{E,D})\big),
+\qquad
+B_{E,D} = ED^\top - \diag\big([E\odot D]\mathbf{1}_m\big),
+\end{equation*}
+with $\ell$ the element-wise binary cross-entropy and the diagonal
+constraint ruling out trivial self-prediction. We write
+$f_{\SAE}(x) = \sigma(x^\top B_{E,D})$ for the trained forward pass and
+$\Sigma = \sigma(B_{E,D})$; entry $\Sigma_{i,j}$ is the probability of
+recipient $j$ opening a template given that only recipient $i$ has opened
+it --- a measure of $i$'s influence on $j$.
+
+\paragraph{Arm score.}
+The bandit score for recipient $j$ at time $t$ is
+\begin{equation}
+\label{eq:score}
+s_j(t) = \alpha\,\phi_j p_j + (1-\alpha) f_j(t),
+\end{equation}
+\begin{equation}
+\label{eq:phi-p-f}
+\phi_j = \frac1n\sum_{i=1}^n X_{i,j},
+\qquad
+p_j = \frac{1}{m-1}\sum_{i\ne j}\Sigma_{j,i},
+\qquad
+f_j(t) = \bar x(t)^\top \Sigma_{:j},
+\end{equation}
+where $\phi_j$ is recipient $j$'s historic open rate, $p_j$ is a general
+influence score, $f_j(t)$ is a confidence score specific to template
+$n{+}1$ given the observed (normalized) state $\bar x(t)$, and
+$\alpha \in [0,1]$ trades off the two. TS parameters are then
+$\alpha_j(t) = Gs_j(t)$, $\beta_j(t) = G(1-s_j(t))$ for a confidence
+modifier $G$.
+
+Two orthogonal readings of Eq.~\eqref{eq:score} motivate our refinements:
+$\phi_j p_j$ vs.\ $f_j(t)$ can be read as \emph{exploration vs.\
+exploitation}, or equivalently as \emph{historic vs.\ current} data.

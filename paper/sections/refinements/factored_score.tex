@@ -1,0 +1,30 @@
+\subsection{Factored Score $s_j(t) = \pi_j(t)\,u_j(t)$}
+\label{sec:factored-score}
+
+The linear combination in Eq.~\eqref{eq:score} conflates the two
+orthogonal axes noted in Section~\ref{sec:recap} --- it is not clear, for
+instance, why exploration should draw solely on historic data while
+exploitation draws solely on current data. We instead factor the score
+into a \emph{probability-of-opening} term and a \emph{utility-of-opening}
+term, each independently schedulable:
+\begin{equation}
+\label{eq:pi-u}
+\pi_j(t) = \alpha(t)\phi_j + (1-\alpha(t))f_j(t),
+\qquad
+u_j(t) = \beta(t)p_j + (1-\beta(t))\cdot 1,
+\end{equation}
+\begin{equation}
+\label{eq:s-factored}
+s_j(t) = \pi_j(t)\,u_j(t)
+       = \Big(\alpha(t)\phi_j + [1-\alpha(t)]f_j(t)\Big)
+         \Big(\beta(t)p_j + [1-\beta(t)]\Big).
+\end{equation}
+Here $\pi_j(t)$ blends historic and current opening-probability estimates,
+while $u_j(t)$ blends the direct value of an open (the constant $1$) with
+its indirect information value $p_j$. This factorization reuses every
+primitive introduced above unchanged, so refinements from
+Sections~\ref{sec:alpha-scheduling}--\ref{sec:variance-p} can be dropped
+into $\pi_j(t)$ and $u_j(t)$ directly --- we use a confidence schedule
+(Eq.~\eqref{eq:alpha-confidence}) for $\alpha(t)$ and a send-volume
+schedule (Eq.~\eqref{eq:alpha-linear}/\eqref{eq:alpha-geometric}) for
+$\beta(t)$.

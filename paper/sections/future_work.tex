@@ -1,0 +1,41 @@
+\section{Future Work}
+\label{sec:future-work}
+
+\begin{itemize}[leftmargin=*]
+
+\item \textbf{Combined $\alpha$-scheduling.} A schedule jointly
+  conditioned on send-progress $\mu$ and open-progress $\tilde o$ rather
+  than either alone (Section~\ref{sec:alpha-scheduling}); the main
+  obstacle is the added hyperparameter count.
+
+\item \textbf{Plug-and-play composition under the factored score.}
+  Systematically combine the primitive-level refinements ---
+  recency-weighted $\phi_j$, forward-pass $f_j(t)$, variance-based $p_j$,
+  TTO- or deep-autoencoder-derived $\Sigma$ --- inside $\pi_j(t)$ and
+  $u_j(t)$ (Eq.~\eqref{eq:pi-u}) rather than evaluating each in isolation,
+  and search jointly rather than ablating one factor at a time, since the
+  gains in Section~\ref{sec:discussion} are not guaranteed to be additive.
+
+\item \textbf{Hyperbolic decay for $Y$.}
+  $Y_{i,j} = \kappa_\delta/(\Delta_{i,j}+\kappa_\delta)$ gives a heavier
+  tail than the exponential label of Eq.~\eqref{eq:Y-decay} and merits a
+  direct comparison.
+
+\item \textbf{TTO-to-TTO autoencoder.} Replacing the SAE input with $Y$ as
+  well, $\min_{E,D}\ell(Y,\sigma(YB_{E,D}))$, exposes TTO on both sides but
+  changes the role of $e_j$ --- an instantaneous open becomes a boundary
+  point rather than a typical input --- so $p_j$ can no longer be queried
+  at $e_j$ and would need re-deriving, e.g.\ via a recipient- or
+  population-level mean-TTO query, with unclear risk of double-counting
+  against $\phi_j$.
+
+\item \textbf{Asymmetric deep encoder/decoder.} The two-layer network of
+  Section~\ref{sec:deep-ae} uses matched encoder/decoder depth and width;
+  decoupling them (e.g.\ a wider encoder with a narrower, more
+  constrained decoder, or vice versa) may better balance representational
+  capacity against the denoising-based regularization, and warrants
+  exploration alongside a wider sweep over masking rate, dropout, and
+  bottleneck width $d$ to address the variance observed in
+  Section~\ref{sec:discussion}.
+
+\end{itemize}

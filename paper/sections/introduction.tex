@@ -1,0 +1,19 @@
+\section{Introduction}
+\label{sec:introduction}
+
+\citet{zid2025active} frame cold-start recipient selection for a
+new email campaign as an iterative multi-armed bandit: each arm is a
+recipient, and Thompson Sampling (TS) parameters are derived from a shallow
+autoencoder (SAE) trained on historical recipient--template opens, avoiding
+retraining during the active-learning phase. Several components of that
+model --- a fixed exploration/exploitation coefficient, an unweighted
+historic open rate, a linear aggregation for the current-state confidence
+term, training on binary labels only, and a shallow autoencoder architecture --- were
+fixed by the original authors for simplicity. We revisit each of these
+choices and propose concrete, mathematically grounded refinements: dynamic
+scheduling of the blend coefficient, a recency-weighted historic rate, a
+nonlinear forward-pass confidence term, a variance-based influence score, a
+factored score function, two ways of exposing the autoencoder to previously
+unused time-to-open (TTO) signal, and a deep, nonlinear autoencoder. We
+report experimental results for each proposal against a reproduced baseline
+and outline directions for further work.
