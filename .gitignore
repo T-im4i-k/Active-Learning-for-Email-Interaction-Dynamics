@@ -109,3 +109,6 @@ data/
 
 # Experiments
 experiments/
+
+# Archives
+*.zip
