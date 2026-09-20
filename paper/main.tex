@@ -2,83 +2,80 @@
 
 \usepackage[authoryear,longnamesfirst]{natbib}
 
-% --- Additional packages not already provided by cas-dc ---
-\usepackage{amsthm}
-\usepackage{mathtools}
-\usepackage{enumitem}
-\providecommand{\mathbbm}[1]{\mathbb{#1}}
+% --- Additional packages used by the article body (not already
+%     provided by cas-dc.cls / cas-common.sty) --------------------
+\usepackage{enumitem}   % \begin{itemize}[leftmargin=*] in future_work.tex
+\usepackage{bbm}        % \mathbbm{1} indicator function in tto.tex
 
-% --- Custom macros (carried over from the original preamble) ---
+% --- Custom macros (carried over from the original preamble.tex) ---
 \newcommand{\R}{\mathbb{R}}
 \DeclareMathOperator{\diag}{diag}
 \DeclareMathOperator*{\argmin}{arg\,min}
 \newcommand{\SAE}{\mathrm{SAE}}
 \newcommand{\DAE}{\mathrm{DAE}}
 
-% Short helper for the recurring "Extends:" note under the title.
-\newcommand{\extendsnote}[1]{%
-  \par\noindent\small\itshape #1\par\vspace{0.5em}
-}
-
 \begin{document}
 \let\WriteBookmarks\relax
 \def\floatpagepagefraction{1}
 \def\textpagefraction{.001}
 
-% Short title
-\shorttitle{Refinements to the SAE--Thompson Sampling Framework}
+% Short title / authors for running heads
+\shorttitle{Refinements to the SAE--TS Framework for Email Outreach}
+\shortauthors{T. Ivanov}
 
-% Short author
-\shortauthors{Ivanov Tymofii}
+% Main title
+\title[mode=title]{Refinements to the SAE--Thompson Sampling Framework for
+  Active Email Outreach}
 
-% Main title of the paper
-\title[mode=title]{Refinements to the SAE--Thompson Sampling Framework for Active Email Outreach}
+% First (and only) author
+\author[1]{Tymofii Ivanov}
+\affiliation[1]{organization={Faculty of Information Technology, Czech
+    Technical University in Prague},
+            city={Prague},
+            country={Czech Republic}}
 
-% First author
-\author[1]{Ivanov Tymofii}
-
-% Address/affiliation
-\affiliation[1]{organization={FIT CTU},
-            addressline={},
-            city={},
-            postcode={},
-            state={},
-            country={}}
-
-% Here goes the abstract
-\begin{abstract}
-This paper extends the SAE--Thompson Sampling framework of
-\citet{zid2025active} for cold-start recipient selection in active email
-outreach. Several components of the original model --- a fixed
-exploration/exploitation coefficient, an unweighted historic open rate, a
-linear aggregation for the current-state confidence term, training on
-binary labels only, and a shallow autoencoder architecture --- were fixed
-by the original authors for simplicity. We revisit each of these choices
-and propose concrete, mathematically grounded refinements, and report
-experimental results for each proposal against a reproduced baseline.
-\end{abstract}
-
-% Research highlights
-\begin{highlights}
-\item Extends the SAE--Thompson Sampling framework for active email outreach of \citet{zid2025active}.
-\item Proposes dynamic $\alpha$-scheduling, a recency-weighted historic open rate, a nonlinear forward-pass confidence term, a variance-based influence score, a factored score function, time-to-open signal, and a deep autoencoder.
-\item Reports experimental results for each proposal against a reproduced baseline.
-\end{highlights}
-
-% Keywords
-\begin{keywords}
-Thompson Sampling \sep Active Learning \sep Autoencoders \sep Email Outreach \sep Multi-Armed Bandits
-\end{keywords}
-
-\maketitle
-
-\extendsnote{%
-  \emph{Extends:} \v{Z}id, \v{C}., Alves, R., and Kord\'ik, P.\ 2025.
+% Unnumbered note reproducing the "Extends:" note from the original draft
+\nonumnote{\emph{Extends:} \v{Z}id, \v{C}., Alves, R., and Kord\'ik, P.\ 2025.
   \emph{Active Recommendation for Email Outreach Dynamics.} In
   \emph{Proceedings of the 34th ACM International Conference on Information
   and Knowledge Management (CIKM~'25)}, Seoul, Republic of Korea.\
-  \url{https://doi.org/10.1145/3746252.3760832}
-}
+  \url{https://doi.org/10.1145/3746252.3760832}}
+
+\begin{abstract}
+\v{Z}id, Alves, and Kord\'ik (2025) frame cold-start recipient selection for a new email
+campaign as an iterative multi-armed bandit driven by Thompson Sampling
+(TS), with parameters derived from a shallow autoencoder (SAE) trained on
+historical recipient--template opens. Several components of that model---a
+fixed exploration/exploitation coefficient, an unweighted historic open
+rate, a linear aggregation for the current-state confidence term, training
+on binary labels only, and a shallow autoencoder architecture---were fixed
+by the original authors for simplicity. We revisit each of these choices
+and propose concrete, mathematically grounded refinements: dynamic
+scheduling of the blend coefficient, a recency-weighted historic rate, a
+nonlinear forward-pass confidence term, a variance-based influence score, a
+factored score function, two ways of exposing the autoencoder to
+previously unused time-to-open (TTO) signal, and a deep, nonlinear
+autoencoder. We report experimental results for each proposal against a
+reproduced baseline and outline directions for further work.
+\end{abstract}
+
+\begin{highlights}
+\item Revisits five simplifying design choices of the SAE--Thompson
+  Sampling email-outreach bandit of \citet{zid2025active}.
+\item A variance-based influence score gives the largest low-sending-
+  fraction recall gain (0.479 vs.\ 0.385 baseline at 5\%).
+\item Recency-weighted historic rate and a factored score also raise
+  Recall-AUC (0.903 and 0.900 vs.\ 0.894 baseline).
+\item A deep, nonlinear autoencoder improves recall modestly but with
+  markedly higher variance, indicating a need for regularization.
+\end{highlights}
+
+\begin{keywords}
+Thompson sampling \sep multi-armed bandits \sep active learning \sep
+email recommendation \sep autoencoders \sep collaborative filtering
+\end{keywords}
+
+\maketitle
 
 \input{sections/introduction}
 \input{sections/recap}
@@ -86,13 +83,7 @@ Thompson Sampling \sep Active Learning \sep Autoencoders \sep Email Outreach \se
 \input{sections/experiments}
 \input{sections/future_work}
 
-% To print the credit authorship contribution details
-\printcredits
-
-%% Loading bibliography style file
 \bibliographystyle{cas-model2-names}
-
-% Loading bibliography database
 \bibliography{references}
 
 \end{document}
