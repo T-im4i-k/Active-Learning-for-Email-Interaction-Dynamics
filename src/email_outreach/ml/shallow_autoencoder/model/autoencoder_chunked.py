@@ -421,7 +421,6 @@ class ShallowAutoencoder(nn.Module):
                 loss.backward(weights)
                 optimizer.step()
             scheduler.step()
-            print(f"=== Epoch {epoch} ===")
 
         return self.training_metrics
 

@@ -73,6 +73,8 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
     deep_autoencoder: bool = False
     sae_bias: bool = False
     p_time: bool = False
+    p_not_sent_only: bool = False
+    negative_feedback_penalty: float = 0.0
 
     def to_dict(self):
         return {
@@ -103,7 +105,9 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "noise_params": self.noise_params,
             "deep_autoencoder": self.deep_autoencoder,
             "sae_bias": self.sae_bias,
-            "p_time": self.p_time
+            "p_not_sent_only": self.p_not_sent_only,
+            "p_time": self.p_time,
+            "negative_feedback_penalty": self.negative_feedback_penalty
         }
 
     @classmethod
@@ -250,6 +254,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             val=val_dataset,
             positive_threshold=positive_threshold
         )
+
+        # print(f"=== E: {self.autoencoder.E.mean()} +- {self.autoencoder.E.std()} ===")
+        # print(f"=== D: {self.autoencoder.D.mean()} +- {self.autoencoder.D.std()} ===")
+
         # TrainingMetrics.plot_average_ndcg(self.autoencoder.training_metrics)
         # TrainingMetrics.plot_f1_score(self.autoencoder.training_metrics)
         if self.show_plots:
@@ -373,9 +381,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             scheduler_args: CoefSchedulerArgs
     ) -> torch.Tensor:
         # Calculate p, f, s
-        fs: torch.tensor = self.calculate_f(opened, newly_opened) if self.config.naive_f else self.non_naive_f(opened)
+        fs: torch.tensor = self.calculate_f(opened, newly_opened) if self.config.naive_f else self.non_naive_f(opened, sent_indices)
         if self.last_p.sum() == 0:
-            ps: torch.tensor = self.calculate_p(opened) if not self.config.p_time else self.calculate_time_p(opened)
+            ps: torch.tensor = self.calculate_p(opened, sent_indices) if not self.config.p_time else self.calculate_time_p(opened)
             self.last_p = ps
         else:
             ps: torch.tensor = self.last_p
@@ -500,7 +508,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             preds = self.autoencoder.predict(users)
 
             # delta_{j,:} = f_SAE(x_{+j}(t)) - f_SAE(x(t)) -- marginal uplift from j opening
-            deltas = preds - baseline
+            deltas = preds
 
             # Remove self-contribution by zeroing the diagonal
             no_self_deltas = deltas.clone()
@@ -516,19 +524,26 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         all_averages = torch.cat(all_averages)
         all_variances = torch.cat(all_variances)
         match self.config.p_type:
-            # case "mean":
-            #     return all_averages
+            case "mean":
+                return all_averages
             case "var":
-                return all_variances
+                return 4*all_variances
             case "std":
-                return torch.sqrt(all_variances)
+                return torch.sqrt(4*all_variances)
             case _:
                 raise ValueError("Unknown p value")
 
-    def calculate_p(self, results: torch.Tensor) -> torch.Tensor:
+    def calculate_p(self, results: torch.Tensor, sent_indices: List[int]) -> torch.Tensor:
         # logger.info("Calculating p")
         batch_size = 100
         input_dim = self.train.num_users
+        not_sent_only = self.config.p_not_sent_only
+
+        if not_sent_only:
+            not_sent_mask = torch.ones(input_dim, dtype=torch.bool)
+            if len(sent_indices) > 0:
+                not_sent_mask[torch.as_tensor(sent_indices, dtype=torch.long)] = False
+
         all_averages = []
         all_variances = []
         for start in range(0, input_dim, batch_size):
@@ -542,9 +557,27 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             for i in range(start, end):
                 no_self_users[i - start, i] = 0
 
-            # Calculate the average
-            averages = no_self_users.mean(dim=1)
-            variances = no_self_users.var(dim=1)
+            if not_sent_only:
+                # Restrict aggregation to i in N(t), i != j
+                batch_mask = not_sent_mask.unsqueeze(0).expand(end - start, -1).clone()
+                for i in range(start, end):
+                    batch_mask[i - start, i] = False  # exclude self regardless of sent status
+
+                counts = batch_mask.sum(dim=1).clamp(min=1)  # guard: |N(t)\{j}| == 0
+                averages = (no_self_users * batch_mask).sum(dim=1) / counts
+
+                # Unbiased variance over the masked set only, falling back to 0 when
+                # fewer than 2 not-yet-sent peers remain (avoids a noisy small-n estimate
+                # late in the active-learning phase, when |N(t)| has shrunk the most).
+                sq_diff = (no_self_users - averages.unsqueeze(1)) ** 2
+                var_counts = (counts - 1).clamp(min=1)
+                variances = (sq_diff * batch_mask).sum(dim=1) / var_counts
+                variances = torch.where(counts > 1, variances, torch.zeros_like(variances))
+            else:
+                # Calculate the average
+                averages = no_self_users.mean(dim=1)
+                variances = no_self_users.var(dim=1)
+
             all_averages.append(averages)
             all_variances.append(variances)
 
@@ -589,8 +622,15 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         else:
             return normalized_f
 
-    def non_naive_f(self, results: torch.Tensor) -> torch.Tensor:
-        current_f = self.autoencoder.predict(results)
+    def non_naive_f(self, results: torch.Tensor, sent_indices: List[int]) -> torch.Tensor:
+        x = results
+        if self.config.negative_feedback_penalty > 0 and len(sent_indices) > 0:
+            x = results.clone()
+            idx = torch.as_tensor(sent_indices, dtype=torch.long, device=results.device)
+            sent_vals = x[..., idx]
+            x[..., idx] = torch.where(sent_vals == 0, torch.full_like(sent_vals, -self.config.negative_feedback_penalty), sent_vals)
+
+        current_f = self.autoencoder.predict(x)
         if self.config.flipped:
             return torch.ones(current_f.shape) - current_f
         else:
