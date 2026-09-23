@@ -20,6 +20,7 @@ from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
 )
 from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
     AutoencoderDataset,
+    NegativeAutoencoderDataset
 )
 from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
     ShallowAutoencoder,
@@ -41,6 +42,17 @@ from typing import Any
 
 
 logger = logging.getLogger(__name__)
+
+
+class NegativeFeedbackPenalty:
+
+    def __init__(self, batch_window: float, half_life: float = float("inf")):
+        self.batch_window = batch_window
+        self.half_life = half_life
+
+    def __call__(self, stages: torch.Tensor, current_stage: float) -> torch.Tensor:
+        elapsed = torch.clamp((current_stage - stages.float()) * self.batch_window, min=0.0)
+        return -torch.pow(2.0, -elapsed / self.half_life)
 
 
 @dataclass
@@ -74,7 +86,11 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
     sae_bias: bool = False
     p_time: bool = False
     p_not_sent_only: bool = False
-    negative_feedback_penalty: float = 0.0
+    penalty_half_life: float = float("inf")  # Negative-feedback half-life, in minutes.
+    # +inf (default) disables the penalty and recovers the original non_naive_f exactly.
+
+    double_sae: bool = False
+    negative_weight: float = 0.1
 
     def to_dict(self):
         return {
@@ -107,7 +123,9 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "sae_bias": self.sae_bias,
             "p_not_sent_only": self.p_not_sent_only,
             "p_time": self.p_time,
-            "negative_feedback_penalty": self.negative_feedback_penalty
+            "penalty_half_life": self.penalty_half_life,
+            "double_sae": self.double_sae,
+            "negative_weight": self.negative_weight
         }
 
     @classmethod
@@ -126,6 +144,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.last_p: torch.Tensor = torch.zeros(0)
         self.last_prenormalized_f: torch.Tensor = torch.zeros(0)
         self.tto_decay: AbstractTTODecay | None = TTODecayFactory.from_config(config.to_dict())
+        self.negative_feedback_penalty = NegativeFeedbackPenalty(
+            batch_window=config.T / config.num_splits,
+            half_life=config.penalty_half_life,
+        )
 
         self.alpha_scheduler: AbstractCoefScheduler = AlphaSchedulerFactory.from_config(config.to_dict())
         self.beta_scheduler: AbstractCoefScheduler | None = BetaSchedulerFactory.from_config(config.to_dict())
@@ -136,6 +158,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.graph_for_n_runs: int = 0
         self.current_mailshot: int = -1
         self.show_plots = False
+        # User index -> batch stage at which they were sent this mailshot's template.
+        # Reset and repopulated per-mailshot in predict(); read by non_naive_f to
+        # compute per-recipient elapsed exposure time for the negative-feedback penalty.
+        self.sent_at_stage: Dict[int, int] = {}
 
         self.pjs_predictions: List[np.array] = []
         self.fjs_predictions: List[np.array] = []
@@ -244,6 +270,28 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.last_prenormalized_f: torch.Tensor = torch.zeros(train.num_users)
 
         logger.info("Fitting the autoencoder")
+
+        if self.config.double_sae:
+            self._negative_autoencoder = ShallowAutoencoder(
+                n=train.num_users,
+                d=self.config.d,
+                layer_norm=self.config.layer_norm,
+                dropout_p=self.config.dropout,
+                bias=self.config.sae_bias,
+                popularity=self.calculate_popularity()
+            )
+
+            self._negative_autoencoder.fit(
+                NegativeAutoencoderDataset(train_dataset),
+                epochs=self.config.epochs,
+                lr=self.config.lr,
+                batch_size=self.config.batch_size,
+                weight_decay=self.config.wd,
+                positive_weight=self.config.negative_weight,
+                val=val_dataset,
+                positive_threshold=positive_threshold
+            )
+
         self.autoencoder.fit(
             train_dataset,
             epochs=self.config.epochs,
@@ -288,6 +336,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
             # User's index: stage
             sent_at_stage: Dict[int, int] = {}
+            self.sent_at_stage = sent_at_stage  # same dict object; .update() below stays in sync
             all_current_opens: Set[int] = set()
             newly_opened: Set[int] = set()
 
@@ -381,7 +430,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             scheduler_args: CoefSchedulerArgs
     ) -> torch.Tensor:
         # Calculate p, f, s
-        fs: torch.tensor = self.calculate_f(opened, newly_opened) if self.config.naive_f else self.non_naive_f(opened, sent_indices)
+        fs: torch.tensor = self.calculate_f(opened, newly_opened) if self.config.naive_f else self.non_naive_f(opened, sent_indices, scheduler_args)
         if self.last_p.sum() == 0:
             ps: torch.tensor = self.calculate_p(opened, sent_indices) if not self.config.p_time else self.calculate_time_p(opened)
             self.last_p = ps
@@ -622,15 +671,34 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         else:
             return normalized_f
 
-    def non_naive_f(self, results: torch.Tensor, sent_indices: List[int]) -> torch.Tensor:
-        x = results
-        if self.config.negative_feedback_penalty > 0 and len(sent_indices) > 0:
-            x = results.clone()
-            idx = torch.as_tensor(sent_indices, dtype=torch.long, device=results.device)
-            sent_vals = x[..., idx]
-            x[..., idx] = torch.where(sent_vals == 0, torch.full_like(sent_vals, -self.config.negative_feedback_penalty), sent_vals)
+    def non_naive_f(
+            self, results: torch.Tensor, sent_indices: List[int], scheduler_args: CoefSchedulerArgs
+    ) -> torch.Tensor:
+        # x = results.clone()
 
-        current_f = self.autoencoder.predict(x)
+        # if len(sent_indices) > 0:
+        #     sent_tensor = torch.as_tensor(sent_indices, dtype=torch.long)
+        #     # Restrict to recipients who were sent this template but have not opened
+        #     # it; openers (x == 1) are left untouched.
+        #     unopened = sent_tensor[x[sent_tensor] == 0]
+        #
+        #     if unopened.numel() > 0:
+        #         stages = torch.tensor(
+        #             [float(self.sent_at_stage[idx.item()]) for idx in unopened]
+        #         )
+        #         x[unopened] = self.negative_feedback_penalty(stages, scheduler_args.batch)
+
+        if not self.config.double_sae:
+            current_f = self.autoencoder.predict(results)
+        else:
+            sent_tensor = torch.as_tensor(sent_indices, dtype=torch.long)
+            unopened = sent_tensor[results[sent_tensor] == 0]
+            negative_results = torch.zeros_like(results)
+            negative_results[unopened] = 1
+
+            pos_logit = self.autoencoder.predict_logit(results)
+            neg_logit = self._negative_autoencoder.predict_logit(negative_results)
+            current_f = torch.sigmoid(pos_logit - neg_logit)
         if self.config.flipped:
             return torch.ones(current_f.shape) - current_f
         else:

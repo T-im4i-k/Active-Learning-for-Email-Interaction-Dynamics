@@ -30,6 +30,7 @@ class AutoencoderDataset(Dataset):
         self.mails = mails
         self.sender_id = sender_id
         self._mailshot_embeddings: np.ndarray = np.array([])
+        self.negative_mailshot_embeddings: np.ndarray = np.array([])
         self._tto_matrix: np.ndarray = np.array([])
         self._time_to_open: Dict[int, Dict[int, float]] = (
             {}
@@ -43,6 +44,7 @@ class AutoencoderDataset(Dataset):
         self._remove_users_with_no_opens(remove_users_below_n_opens)
         self._reverse_user_id_mapper: Dict[int, int] = {}
         self._mails_to_data()
+        self._mails_to_negative_data()
         self._mails_to_tto_data()
         self._user_clusters: Optional[pd.DataFrame] = None
         self._training_mask_recalc = 0
@@ -244,6 +246,20 @@ class AutoencoderDataset(Dataset):
             mailshot_embeddings.append(feature_vector)
         self._mailshot_embeddings = np.array(mailshot_embeddings).astype(np.float32)
 
+    def _mails_to_negative_data(self):
+        negative_mailshot_embeddings = []
+        for mailshot_id in self.mails["mailshot_id"].unique():
+            feature_vector = np.zeros(len(self._user_id_mapper))
+            # Fill in the sent-but-unopened mails
+            unopened = self.mails[
+                (self.mails["mailshot_id"] == mailshot_id)
+                & (self.mails["opened"] == 0)
+                & (self.mails["user_id"].isin(self._user_id_mapper.values()))
+            ]
+            feature_vector[unopened["user_id"]] = 1
+            negative_mailshot_embeddings.append(feature_vector)
+        self.negative_mailshot_embeddings = np.array(negative_mailshot_embeddings).astype(np.float32)
+
     def _mails_to_tto_data(self):
         tto_matrix = []
         for mailshot_id in self.mails.mailshot_id.unique():
@@ -301,3 +317,21 @@ class AutoencoderDataset(Dataset):
         Returns a tensor of opens for the given mailshot_id.
         """
         return torch.tensor(self._mailshot_embeddings[mailshot_id])
+
+    def tensor_of_unopens_of_mailshot(self, mailshot_id: int) -> torch.Tensor:
+        """
+        Returns a tensor of sent-but-unopened recipients for the given mailshot_id.
+        """
+        return torch.tensor(self.negative_mailshot_embeddings[mailshot_id])
+
+
+class NegativeAutoencoderDataset(Dataset):
+    def __init__(self, autoencoder_dataset: AutoencoderDataset):
+        self.dataset = autoencoder_dataset
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, index) -> tuple[torch.Tensor, torch.Tensor]:
+        x = torch.tensor(self.dataset.negative_mailshot_embeddings[index])
+        return x, x

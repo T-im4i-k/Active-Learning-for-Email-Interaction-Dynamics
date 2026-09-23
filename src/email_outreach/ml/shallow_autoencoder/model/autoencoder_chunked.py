@@ -354,15 +354,7 @@ class ShallowAutoencoder(nn.Module):
 
         self.training_metrics = []
 
-    def forward(self, X):
-        """
-        This function assumes the input X is a batch of data. It will be multiplied by E and D to get the hidden layer.
-        :param X: torch.Tensor of shape [batch_size, n]
-        :return: torch.Tensor of shape [batch_size, n] -> this should represent the reconstruction of the input.
-        """
-        # res = X @ torch.diag((E * D) @ torch.ones(d))
-        # res2 = X * (E * D).sum(dim=1)
-        # res == res2
+    def logit(self, X):
         diag_vals = (self.E * self.D).sum(dim=1)  # * np.sqrt(1.0 / self.D.size(1))
         hidden = X @ self.E
 
@@ -374,6 +366,24 @@ class ShallowAutoencoder(nn.Module):
         out = out - (X * diag_vals)
         if self.bias:
             out = out + self.bias_param
+        return out
+
+    def logit_for_user(self, X):
+        diag_vals = (self.E * self.D).sum(dim=1)
+        hidden = X @ self.E
+        out = hidden @ self.D.t()
+        out = out - (X * diag_vals)
+        if self.bias:
+            out = out + self.bias_param
+        return out
+
+    def forward(self, X):
+        """
+        This function assumes the input X is a batch of data. It will be multiplied by E and D to get the hidden layer.
+        :param X: torch.Tensor of shape [batch_size, n]
+        :return: torch.Tensor of shape [batch_size, n] -> this should represent the reconstruction of the input.
+        """
+        out = self.logit(X)
         return torch.sigmoid(out)
 
     def forward_for_user(self, X):
@@ -382,12 +392,7 @@ class ShallowAutoencoder(nn.Module):
         :param X: torch.Tensor of shape [1, n]
         :return: torch.Tensor of shape [1, n] -> this should represent how predictive this user is for each user.
         """
-        diag_vals = (self.E * self.D).sum(dim=1)
-        hidden = X @ self.E
-        out = hidden @ self.D.t()
-        out = out - (X * diag_vals)
-        if self.bias:
-            out = out + self.bias_param
+        out = self.logit_for_user(X)
         return torch.sigmoid(out)
 
     def fit_improved(
@@ -453,6 +458,13 @@ class ShallowAutoencoder(nn.Module):
         with torch.no_grad():
             X = X.to(self.device)
             reconstruction = self.forward(X)
+        return reconstruction
+
+    def predict_logit(self, X):
+        self.eval()
+        with torch.no_grad():
+            X = X.to(self.device)
+            reconstruction = self.logit(X)
         return reconstruction
 
     def predict_for_user(self, X):
