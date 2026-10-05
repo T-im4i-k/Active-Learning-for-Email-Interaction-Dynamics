@@ -3,13 +3,10 @@ campaign as an iterative multi-armed bandit driven by Thompson Sampling
 (TS), with parameters derived from a shallow autoencoder (SAE) trained on
 historical recipient--template opens. Several components of that model---a
 fixed exploration/exploitation coefficient, an unweighted historic open
-rate, a linear aggregation for the current-state confidence term, training
-on binary labels only, and a shallow autoencoder architecture---were fixed
-by the original authors for simplicity. We revisit each of these choices
-and propose concrete, mathematically grounded refinements: dynamic
+rate, and a linear aggregation for the current-state confidence term---were
+fixed by the original authors for simplicity. We revisit each of these
+choices and propose concrete, mathematically grounded refinements: dynamic
 scheduling of the blend coefficient, a recency-weighted historic rate, a
-nonlinear forward-pass confidence term, a variance-based influence score, a
-factored score function, two ways of exposing the autoencoder to
-previously unused time-to-open (TTO) signal, and a deep, nonlinear
-autoencoder. We report experimental results for each proposal against a
-reproduced baseline and outline directions for further work.
+nonlinear forward-pass confidence term, a variance-based influence score,
+and a factored score function. We also describe the evaluation protocol
+used to compare each proposal against a reproduced baseline.

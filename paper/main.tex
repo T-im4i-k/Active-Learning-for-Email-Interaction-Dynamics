@@ -2,17 +2,11 @@
 
 \usepackage[authoryear,longnamesfirst]{natbib}
 
-% --- Additional packages used by the article body (not already
-%     provided by cas-dc.cls / cas-common.sty) --------------------
-\usepackage{enumitem}   % \begin{itemize}[leftmargin=*] in future_work.tex
-\usepackage{bbm}        % \mathbbm{1} indicator function in tto.tex
-
 % --- Custom macros (carried over from the original preamble.tex) ---
 \newcommand{\R}{\mathbb{R}}
 \DeclareMathOperator{\diag}{diag}
 \DeclareMathOperator*{\argmin}{arg\,min}
 \newcommand{\SAE}{\mathrm{SAE}}
-\newcommand{\DAE}{\mathrm{DAE}}
 
 \begin{document}
 \let\WriteBookmarks\relax
@@ -47,28 +41,14 @@ campaign as an iterative multi-armed bandit driven by Thompson Sampling
 (TS), with parameters derived from a shallow autoencoder (SAE) trained on
 historical recipient--template opens. Several components of that model---a
 fixed exploration/exploitation coefficient, an unweighted historic open
-rate, a linear aggregation for the current-state confidence term, training
-on binary labels only, and a shallow autoencoder architecture---were fixed
-by the original authors for simplicity. We revisit each of these choices
-and propose concrete, mathematically grounded refinements: dynamic
+rate, and a linear aggregation for the current-state confidence term---were
+fixed by the original authors for simplicity. We revisit each of these
+choices and propose concrete, mathematically grounded refinements: dynamic
 scheduling of the blend coefficient, a recency-weighted historic rate, a
-nonlinear forward-pass confidence term, a variance-based influence score, a
-factored score function, two ways of exposing the autoencoder to
-previously unused time-to-open (TTO) signal, and a deep, nonlinear
-autoencoder. We report experimental results for each proposal against a
-reproduced baseline and outline directions for further work.
+nonlinear forward-pass confidence term, a variance-based influence score,
+and a factored score function. We also describe the evaluation protocol
+used to compare each proposal against a reproduced baseline.
 \end{abstract}
-
-\begin{highlights}
-\item Revisits five simplifying design choices of the SAE--Thompson
-  Sampling email-outreach bandit of \citet{zid2025active}.
-\item A variance-based influence score gives the largest low-sending-
-  fraction recall gain (0.479 vs.\ 0.385 baseline at 5\%).
-\item Recency-weighted historic rate and a factored score also raise
-  Recall-AUC (0.903 and 0.900 vs.\ 0.894 baseline).
-\item A deep, nonlinear autoencoder improves recall modestly but with
-  markedly higher variance, indicating a need for regularization.
-\end{highlights}
 
 \begin{keywords}
 Thompson sampling \sep multi-armed bandits \sep active learning \sep
@@ -81,7 +61,6 @@ email recommendation \sep autoencoders \sep collaborative filtering
 \input{sections/recap}
 \input{sections/refinements}
 \input{sections/experiments}
-\input{sections/future_work}
 
 \bibliographystyle{cas-model2-names}
 \bibliography{references}
