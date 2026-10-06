@@ -13,6 +13,8 @@ from matplotlib import pyplot as plt
 from email_outreach.experiment_utils.experiment_constants import (
     CONTEXTUAL_BANDIT_FOLDER_NAME,
 )
+from email_outreach.utils.constants import ROOT_FOLDER
+
 from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
     AbstractConfig,
     AbstractContextualModel,
@@ -92,6 +94,11 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
     double_sae: bool = False
     negative_weight: float = 0.1
 
+
+    f_confidence: float = 1.0
+    negative_feedback_ratio: float = 0.1
+
+
     def to_dict(self):
         return {
             "d": self.d,
@@ -125,7 +132,9 @@ class ContextualBanditWithAutoencoderConfig(AbstractConfig):
             "p_time": self.p_time,
             "penalty_half_life": self.penalty_half_life,
             "double_sae": self.double_sae,
-            "negative_weight": self.negative_weight
+            "negative_weight": self.negative_weight,
+            "f_confidence": self.f_confidence,
+            "negative_feedback_ratio": self.negative_feedback_ratio
         }
 
     @classmethod
@@ -166,6 +175,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.pjs_predictions: List[np.array] = []
         self.fjs_predictions: List[np.array] = []
         self.sjs_predictions: List[np.array] = []
+
+        self.u_predictions: list[np.ndarray] = []
+        self.pi_predictions: list[np.ndarray] = []
+
         self.user_mask: List[np.array] = []
 
         self._popularity_tensor = None
@@ -382,7 +395,17 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 metrics[user].prediction = score
 
             all_metrics.extend(metrics)
+            np.save(ROOT_FOLDER / "additional_data" / "u_predictions.npy", np.array(self.u_predictions, dtype=np.float64))
+            np.save(ROOT_FOLDER / "additional_data" / "pi_predictions.npy", np.array(self.pi_predictions, dtype=np.float64))
+            print("Saving results")
+
         self.calculated_metrics = all_metrics
+
+        # self.u_predictions = np.array(self.u_predictions)
+        # self.pi_predictions = np.array(self.pi_predictions)
+
+
+
         return all_metrics
 
     @staticmethod
@@ -418,6 +441,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         pi = alpha * phi + (1 - alpha) * f
         u = beta * p + (1 - beta)
         s = pi * u
+
+        self.u_predictions.append(u.detach().numpy())
+        self.pi_predictions.append(pi.detach().numpy())
+
         assert s.max() <= 1, f"Max s: {s.max()}, should be <=1"
         return s
 
@@ -689,7 +716,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         #         x[unopened] = self.negative_feedback_penalty(stages, scheduler_args.batch)
 
         if not self.config.double_sae:
-            current_f = self.autoencoder.predict(results)
+            current_f = torch.sigmoid(self.autoencoder.predict_logit(results) * self.config.f_confidence)
         else:
             sent_tensor = torch.as_tensor(sent_indices, dtype=torch.long)
             unopened = sent_tensor[results[sent_tensor] == 0]
@@ -698,7 +725,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
             pos_logit = self.autoencoder.predict_logit(results)
             neg_logit = self._negative_autoencoder.predict_logit(negative_results)
-            current_f = torch.sigmoid(pos_logit - neg_logit)
+            current_f = torch.sigmoid(
+                ((1-self.config.negative_feedback_ratio) * pos_logit - self.config.negative_feedback_ratio * neg_logit) * self.config.f_confidence
+            )
         if self.config.flipped:
             return torch.ones(current_f.shape) - current_f
         else:

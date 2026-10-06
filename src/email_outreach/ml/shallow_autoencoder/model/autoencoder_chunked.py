@@ -14,6 +14,7 @@ from email_outreach.utils.common_utils import set_seed
 
 from typing import OrderedDict
 import numpy as np
+
 # References:
 # - Sedhain S. et al., "AutoRec: Autoencoders Meet Collaborative Filtering," WWW 2015.
 #   https://arxiv.org/abs/1508.01195
@@ -147,13 +148,12 @@ class DeepAutoencoder(nn.Module):
     ):
         super().__init__()
 
-
         self.encoder = nn.Sequential(
             OrderedDict([
-                ("encoder_l1", nn.Linear(in_features=n, out_features=2*d)),
+                ("encoder_l1", nn.Linear(in_features=n, out_features=2 * d)),
                 ("encoder_dropout1", nn.Dropout(p=dropout_p)),
                 ("encoder_relu1", nn.ReLU()),
-                ("encoder_l2", nn.Linear(in_features=2*d, out_features=d))
+                ("encoder_l2", nn.Linear(in_features=2 * d, out_features=d))
             ])
         )
 
@@ -164,17 +164,16 @@ class DeepAutoencoder(nn.Module):
 
         self.decoder = nn.Sequential(
             OrderedDict([
-                ("decoder_l1", nn.Linear(in_features=d, out_features=2*d)),
+                ("decoder_l1", nn.Linear(in_features=d, out_features=2 * d)),
                 ("decoder_dropout1", nn.Dropout(p=dropout_p)),
                 ("decoder_relu1", nn.ReLU()),
-                ("decoder_l2", nn.Linear(in_features=2*d, out_features=n))
+                ("decoder_l2", nn.Linear(in_features=2 * d, out_features=n))
             ])
         )
 
         # nn.init.xavier_uniform_(self.decoder.weight)
 
         self.sigmoid = nn.Sigmoid()
-
 
     def forward(self, X):
         X = self.encoder(X)
@@ -185,7 +184,6 @@ class DeepAutoencoder(nn.Module):
 
     def forward_for_user(self, x):
         return self.forward(x)
-
 
     def predict(self, X):
         self.eval()
@@ -287,7 +285,7 @@ class DeepAutoencoder(nn.Module):
 
         return self.fit_improved(
             train=train,
-            val = val,
+            val=val,
             epochs=epochs,
             lr=lr,
             batch_size=batch_size,
@@ -295,7 +293,6 @@ class DeepAutoencoder(nn.Module):
             positive_weight=positive_weight,
             positive_threshold=positive_threshold
         )
-
 
 
 class ShallowAutoencoder(nn.Module):
@@ -314,7 +311,8 @@ class ShallowAutoencoder(nn.Module):
     """
 
     def __init__(
-        self, n: int, d: int, popularity: torch.Tensor, device: str = None, layer_norm=False, dropout_p=0.1, bias: bool = False,
+            self, n: int, d: int, popularity: torch.Tensor, device: str = None, layer_norm=False, dropout_p=0.1,
+            bias: bool = False,
     ):
         super().__init__()
         self.E = nn.Parameter(torch.empty(n, d))
@@ -322,12 +320,11 @@ class ShallowAutoencoder(nn.Module):
 
         self.bias = bias
 
-
         if self.bias:
-           self.bias_param = nn.Parameter(torch.empty(n))
-           init.zeros_(self.bias_param)
-               # bias_init = torch.logit(popularity, eps = 1e-6)
-               # self.bias_param.copy_(bias_init)
+            self.bias_param = nn.Parameter(torch.empty(n))
+            init.zeros_(self.bias_param)
+            # bias_init = torch.logit(popularity, eps = 1e-6)
+            # self.bias_param.copy_(bias_init)
 
         # Use Xavier (Glorot) initialization to avoid outputs hovering around 0.5
         init.xavier_uniform_(self.E)
