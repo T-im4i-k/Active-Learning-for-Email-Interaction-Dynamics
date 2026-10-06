@@ -1,0 +1,70 @@
+\subsection{Negative Feedback via a Second SAE}
+\label{sec:negative-feedback}
+
+The model of Section~\ref{sec:recap} learns from opens alone: both the
+training matrix $X$ and the state $x(t)$ encode a recipient who was
+contacted but did not open exactly as one who was never contacted. The data,
+however, distinguish three cases --- \emph{sent and opened}, \emph{sent but
+not opened}, and \emph{not sent} --- and the middle one is informative: an
+ignored email is evidence against opening for similar recipients. We
+recover it through the send matrix $S\in\{0,1\}^{n\times m}$, where
+$S_{i,j}=1$ if template $i$ was sent to recipient $j$ (so $X_{i,j}\le
+S_{i,j}$), and train a second SAE on the complementary signal.
+
+\paragraph{Negative channel.}
+We write $X^{+}=X$ and define the sent-but-unopened matrix
+\begin{equation}
+\label{eq:x-neg}
+X^{-}_{i,j} = S_{i,j}\,\big(1-X_{i,j}\big)\in\{0,1\}.
+\end{equation}
+We train two SAEs, $(E^{+},D^{+})$ on $X^{+}$ and $(E^{-},D^{-})$ on
+$X^{-}$, each with the objective of Section~\ref{sec:recap} (same bottleneck
+size $d$), and write $B^{\pm}=B_{E^{\pm},D^{\pm}}$; the positive SAE is the
+original one. At time $t$ the state of template $n{+}1$ splits accordingly:
+$x^{+}(t)=x(t)$ marks recipients who have opened, and $x^{-}(t)\in\{0,1\}^m$
+marks recipients who were sent the template in $[0,t)$ and have not opened
+it. The three kinds of recipient are thus separated, with
+$(x^{+}_j(t),x^{-}_j(t))$ equal to $(1,0)$, $(0,1)$ and $(0,0)$ for
+opened, sent-but-unopened and not-yet-contacted recipients, respectively.
+
+\paragraph{Logit blending.}
+Let
+\begin{equation}
+\label{eq:z-pm}
+z^{+}_j(t) = x^{+}(t)^\top B^{+}e_j,
+\qquad
+z^{-}_j(t) = -\,x^{-}(t)^\top B^{-}e_j
+\end{equation}
+be the positive and negative logits. The minus sign encodes the direction
+of the evidence: a large $B^{-}_{i,j}$ means that $i$ failing to open makes
+$j$ failing more likely, which must \emph{lower} $f_j(t)$. Equivalently, the
+negative SAE is queried with the state $-x^{-}(t)$ (a $-1$ for every
+sent-but-unopened recipient), while it is trained on the $0/1$ targets
+$X^{-}$ so that the cross-entropy remains well-defined. We blend the two
+channels in logit space,
+\begin{equation}
+\label{eq:f-neg}
+f_j(t) = \sigma\big(\lambda z^{+}_j(t) + (1-\lambda)z^{-}_j(t)\big),
+\qquad \lambda\in[0,1].
+\end{equation}
+Since the blend acts before $\sigma$, Eq.~\eqref{eq:f-neg} extends the
+forward-pass definition of Section~\ref{sec:forward-f}, not the linear form
+of Eq.~\eqref{eq:phi-p-f}, which has no logit to blend. For $\lambda=1$ it
+reduces exactly to Eq.~\eqref{eq:f-forward}; with no evidence
+($x^{+}(t)=x^{-}(t)=\mathbf{0}$) it returns the neutral prior $\tfrac12$ of
+the original SAE; and $\lambda=\tfrac12$ gives the unweighted sum of logits
+up to a global rescaling by $2$.
+
+\paragraph{Role of $\lambda$.}
+A weight is needed because the two channels are unbalanced. With open rates
+around $9\%$ in the original dataset, sent-but-unopened entries outnumber
+opens roughly ten to one, so $X^{-}$ is far denser than $X^{+}$ and
+$x^{-}(t)$ typically has far more non-zeros than $x^{+}(t)$; an unweighted
+$z^{-}_j(t)$ would accumulate many more terms than $z^{+}_j(t)$ and
+dominate. Moreover, a missing open is weaker evidence than an open: the
+recipient may simply not have read the email yet. The coefficient $\lambda$
+trades the two off, and, like $\alpha$, is a hyperparameter of the model.
+Both SAEs are trained once offline, so the active-learning phase remains
+free of retraining, and $f_j(t)$ from Eq.~\eqref{eq:f-neg} can replace
+$f_j(t)$ in Eq.~\eqref{eq:score} or in $\pi_j(t)$ of
+Eq.~\eqref{eq:pi-u} without further changes.

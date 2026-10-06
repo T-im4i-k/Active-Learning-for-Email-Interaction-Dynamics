@@ -8,10 +8,14 @@ autoencoder (SAE) trained on historical recipient--template opens, avoiding
 retraining during the active-learning phase. Several components of that
 model --- a fixed exploration/exploitation coefficient, an unweighted
 historic open rate, and a linear aggregation for the current-state
-confidence term --- were fixed by the original authors for simplicity. We
-revisit each of these choices and propose concrete, mathematically grounded
+confidence term --- were fixed by the original authors for simplicity.
+Moreover, the model learns from opens alone, so a recipient who was
+contacted but did not open is treated as one who was never contacted. We
+revisit these choices and propose concrete, mathematically grounded
 refinements: dynamic scheduling of the blend coefficient, a
 recency-weighted historic rate, a nonlinear forward-pass confidence term, a
+negative-feedback component in which a second SAE trained on
+sent-but-unopened messages is blended with the original in logit space, a
 variance-based influence score, and a factored score function. We also
 describe the evaluation protocol used to compare each proposal against a
 reproduced baseline.
