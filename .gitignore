@@ -112,3 +112,5 @@ experiments/
 
 # Archives
 *.zip
+
+*.npy
