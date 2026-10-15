@@ -172,6 +172,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         # compute per-recipient elapsed exposure time for the negative-feedback penalty.
         self.sent_at_stage: Dict[int, int] = {}
 
+        self.p_predictions: list[np.array] = []
+
         self.pjs_predictions: List[np.array] = []
         self.fjs_predictions: List[np.array] = []
         self.sjs_predictions: List[np.array] = []
@@ -206,6 +208,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             train: AutoencoderDataset,
             val: AutoencoderDataset,
     ) -> None:
+
+        # np.save(ROOT_FOLDER / "additional_data" / "X" /"train_X.npy", train._mailshot_embeddings)
+
         super().fit(train, val)
 
         weight_config = self.config.to_dict() | {"min_template_id": self.train.min_template_id,
@@ -305,6 +310,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 positive_threshold=positive_threshold
             )
 
+            # np.save(ROOT_FOLDER / "additional_data" / "D" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
+
         self.autoencoder.fit(
             train_dataset,
             epochs=self.config.epochs,
@@ -315,6 +322,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             val=val_dataset,
             positive_threshold=positive_threshold
         )
+
+        # np.save(ROOT_FOLDER / "additional_data" / "D" /"sae_D.npy", self.autoencoder.D.detach().numpy())
+
+        # np.save(self.autoencoder.D.detach().numpy())
 
         # print(f"=== E: {self.autoencoder.E.mean()} +- {self.autoencoder.E.std()} ===")
         # print(f"=== D: {self.autoencoder.D.mean()} +- {self.autoencoder.D.std()} ===")
@@ -395,8 +406,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 metrics[user].prediction = score
 
             all_metrics.extend(metrics)
-            np.save(ROOT_FOLDER / "additional_data" / "u_predictions.npy", np.array(self.u_predictions, dtype=np.float64))
-            np.save(ROOT_FOLDER / "additional_data" / "pi_predictions.npy", np.array(self.pi_predictions, dtype=np.float64))
+            # np.save(ROOT_FOLDER / "additional_data" / "u_predictions.npy", np.array(self.u_predictions, dtype=np.float64))
+            # np.save(ROOT_FOLDER / "additional_data" / "pi_predictions.npy", np.array(self.pi_predictions, dtype=np.float64))
             print("Saving results")
 
         self.calculated_metrics = all_metrics
@@ -459,8 +470,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         # Calculate p, f, s
         fs: torch.tensor = self.calculate_f(opened, newly_opened) if self.config.naive_f else self.non_naive_f(opened, sent_indices, scheduler_args)
         if self.last_p.sum() == 0:
-            ps: torch.tensor = self.calculate_p(opened, sent_indices) if not self.config.p_time else self.calculate_time_p(opened)
+            ps: torch.tensor = self.calculate_p(opened, sent_indices, scheduler_args.batch) if not self.config.p_time else self.calculate_time_p(opened)
             self.last_p = ps
+
+            # np.save(ROOT_FOLDER / "additional_data" / "p_scores" / "p_var.npy",
+            #         np.array(self.last_p.detach().numpy(), dtype=np.float64))
+
         else:
             ps: torch.tensor = self.last_p
         popularity: torch.tensor = self.calculate_popularity()
@@ -609,7 +624,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             case _:
                 raise ValueError("Unknown p value")
 
-    def calculate_p(self, results: torch.Tensor, sent_indices: List[int]) -> torch.Tensor:
+    def calculate_p(self, results: torch.Tensor, sent_indices: List[int], batch: int) -> torch.Tensor:
         # logger.info("Calculating p")
         batch_size = 100
         input_dim = self.train.num_users
@@ -658,7 +673,49 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             all_variances.append(variances)
 
         all_averages = torch.cat(all_averages)
+
+        max_average_idx = torch.argmax(all_averages)
+        max_average_input = torch.zeros(input_dim)
+        max_average_input[max_average_idx] = 1
+
+        max_average_row = self.autoencoder.predict(max_average_input)
+        # np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "avg.npy",
+        #         np.array(max_average_row.detach().numpy(), dtype=np.float64))
+
+
+
         all_variances = torch.cat(all_variances)
+
+        max_var_idx = torch.argmax(all_variances)
+        max_var_input = torch.zeros(input_dim)
+        max_var_input[max_var_idx] = 1
+
+        max_var_row = self.autoencoder.predict(max_var_input)
+        # np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "var.npy",
+        #         np.array(max_var_row.detach().numpy(), dtype=np.float64))
+
+
+        # ==== ===
+        from scipy.stats import rankdata
+        mean_ranking = rankdata(-all_averages, method='min')
+        var_ranking = rankdata(-all_variances, method='min')
+
+        rank_flips = torch.abs(torch.tensor(var_ranking - mean_ranking))
+
+        biggest_rank_flip = torch.argmax(rank_flips)
+        biggest_rank_flip_vec = torch.zeros(self.train.num_users)
+        biggest_rank_flip_vec[biggest_rank_flip] = 1
+
+        sigma_row = self.autoencoder.predict(biggest_rank_flip_vec.unsqueeze(0))
+        np.save(ROOT_FOLDER / "additional_data" / "p_scores" / f"rank_flip_sigma_row.npy",
+                np.array(sigma_row.detach().numpy(), dtype=np.float64))
+
+        np.save(ROOT_FOLDER / "additional_data" / "p_scores" / f"p_mean.npy",
+                np.array(all_averages.detach().numpy(), dtype=np.float64))
+
+        np.save(ROOT_FOLDER / "additional_data" / "p_scores" / f"p_var.npy",
+                np.array(4*all_variances.detach().numpy(), dtype=np.float64))
+
         match self.config.p_type:
             case "mean":
                 return all_averages
