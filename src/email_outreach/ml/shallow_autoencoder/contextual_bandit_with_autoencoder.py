@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from copy import deepcopy
-from typing import Dict, List, Set, Tuple, Type
+from typing import Type
 
 import numpy as np
 import torch
@@ -23,11 +23,11 @@ from email_outreach.ml.shallow_autoencoder.config import (
     ContextualBanditMetrics,
     ContextualBanditWithAutoencoderConfig,
 )
-from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
+from email_outreach.ml.shallow_autoencoder.autoencoder_dataset import (
     AutoencoderDataset,
     NegativeAutoencoderDataset,
 )
-from email_outreach.ml.shallow_autoencoder.dataset.template_weight import (
+from email_outreach.ml.shallow_autoencoder.template_weight import (
     AbstractTemplateWeight,
     TemplateWeightFactory,
 )
@@ -40,9 +40,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
     def __init__(self, config: ContextualBanditWithAutoencoderConfig):
         super().__init__(config)
-        self._autoencoder = None
-        self.last_p: torch.Tensor = torch.zeros(0)
-        self.last_prenormalized_f: torch.Tensor = torch.zeros(0)
+
+        self.config = config
+        self._autoencoder: ShallowAutoencoder | None = None
 
         self.alpha_scheduler: AbstractCoefScheduler = AlphaSchedulerFactory.from_config(
             config.to_dict()
@@ -52,23 +52,15 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         )
         self._template_weight: AbstractTemplateWeight | None = None
 
-        self.config = config
-        self.calculated_metrics: List[ContextualBanditMetrics] = []
+        self.calculated_metrics: list[ContextualBanditMetrics] = []
+        self.sent_at_stage: dict[int, int] = {}
+        self.user_mask: list[np.ndarray] = []
 
-        self.sent_at_stage: Dict[int, int] = {}
+        self._naive_f_partial: torch.Tensor | None = None
+        self._p_cache: torch.Tensor | None = None
+        self._phi_cache: torch.Tensor | None = None
 
-        self.p_predictions: list[np.array] = []
 
-        self.pjs_predictions: List[np.array] = []
-        self.fjs_predictions: List[np.array] = []
-        self.sjs_predictions: List[np.array] = []
-
-        self.u_predictions: list[np.ndarray] = []
-        self.pi_predictions: list[np.ndarray] = []
-
-        self.user_mask: List[np.array] = []
-
-        self._popularity_tensor = None
 
     @classmethod
     def model_name(cls) -> str:
@@ -94,8 +86,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         val: AutoencoderDataset,
     ) -> None:
 
-        # np.save(ROOT_FOLDER / "additional_data" / "X" /"train_X.npy", train._mailshot_embeddings)
-
         super().fit(train, val)
 
         weight_config = self.config.to_dict() | {
@@ -108,8 +98,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             n=train.num_users, d=self.config.d, dropout_p=self.config.dropout
         )
 
-        self.last_p: torch.Tensor = torch.zeros(train.num_users)
-        self.last_prenormalized_f: torch.Tensor = torch.zeros(train.num_users)
+        self._naive_f_partial: torch.Tensor = torch.zeros(train.num_users)
 
         logger.info("Fitting the autoencoder")
 
@@ -122,31 +111,31 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
             self._negative_autoencoder.fit(
                 NegativeAutoencoderDataset(train),
+                val=val,
                 epochs=self.config.epochs,
                 lr=self.config.lr,
                 batch_size=self.config.batch_size,
                 weight_decay=self.config.wd,
                 positive_weight=self.config.negative_weight,
-                val=val,
             )
 
             # np.save(ROOT_FOLDER / "additional_data" / "D" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
 
         self.autoencoder.fit(
             train,
+            val=val,
             epochs=self.config.epochs,
             lr=self.config.lr,
             batch_size=self.config.batch_size,
             weight_decay=self.config.wd,
             positive_weight=self.config.positive_weight,
-            val=val,
         )
 
         # np.save(ROOT_FOLDER / "additional_data" / "D" /"sae_D.npy", self.autoencoder.D.detach().numpy())
         logger.info("Autoencoder fitted")
 
-    def predict(self, data: AutoencoderDataset) -> List[ContextualBanditMetrics]:
-        all_metrics: List[ContextualBanditMetrics] = []
+    def predict(self, data: AutoencoderDataset) -> list[ContextualBanditMetrics]:
+        all_metrics: list[ContextualBanditMetrics] = []
         input_dim = self.train.num_users
         T: int = self.config.T
         num_splits: int = self.config.num_splits  # number of splits
@@ -157,18 +146,18 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         for mailshot_index, mailshot_id in enumerate(data.mailshot_ids):
             # logger.info(f"-----------------------------------")
             # logger.info(f"Predicting for mailshot {mailshot_id}")
-            already_sent: List[int] = []  # List of already sent users
-            already_scored: List[float] = []  # List of scores for already sent users
+            already_sent: list[int] = []  # list of already sent users
+            already_scored: list[float] = []  # list of scores for already sent users
             opened: torch.tensor = torch.zeros(input_dim)
-            mailshot_users: List[int] = data.mailshot_user_indices(mailshot_id)
+            mailshot_users: list[int] = data.mailshot_user_indices(mailshot_id)
 
             # User's index: stage
-            sent_at_stage: Dict[int, int] = {}
+            sent_at_stage: dict[int, int] = {}
             self.sent_at_stage = (
                 sent_at_stage  # same dict object; .update() below stays in sync
             )
-            all_current_opens: Set[int] = set()
-            newly_opened: Set[int] = set()
+            all_current_opens: set[int] = set()
+            newly_opened: set[int] = set()
 
             for batch_i in range(num_splits):
                 # logger.info(f"Predicting batch {i}")
@@ -185,7 +174,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 already_sent.extend(predicted_batch)
                 already_scored.extend(predicted_scores)
                 sent_at_stage.update({user: batch_i for user in predicted_batch})
-                opens_from_batch: Set[int] = set(
+                opens_from_batch: set[int] = set(
                     self.update_opens(
                         data, mailshot_id, sent_at_stage, time_frame_minutes
                     )
@@ -206,7 +195,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                     batch=num_splits, open_frac=len(all_current_opens) / input_dim
                 ),
             )
-            metrics: List[ContextualBanditMetrics] = self.final_metrics(
+            metrics: list[ContextualBanditMetrics] = self.final_metrics(
                 mailshot_index, data, mailshot_users, already_sent, predictions
             )
             for m in metrics:
@@ -219,14 +208,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 metrics[user].prediction = score
 
             all_metrics.extend(metrics)
-            # np.save(ROOT_FOLDER / "additional_data" / "u_predictions.npy", np.array(self.u_predictions, dtype=np.float64))
-            # np.save(ROOT_FOLDER / "additional_data" / "pi_predictions.npy", np.array(self.pi_predictions, dtype=np.float64))
             print("Saving results")
 
         self.calculated_metrics = all_metrics
-
-        # self.u_predictions = np.array(self.u_predictions)
-        # self.pi_predictions = np.array(self.pi_predictions)
 
         return all_metrics
 
@@ -234,10 +218,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
     def update_opens(
         dataset: AutoencoderDataset,
         mailshot_id: int,
-        sent_at_stage: Dict[int, int],
+        sent_at_stage: dict[int, int],
         frame_minutes: int,
-    ) -> List[int]:
-        opened_indices: List[int] = []
+    ) -> list[int]:
+        opened_indices: list[int] = []
         grouped_sent_at_stage = defaultdict(list)
         # logger.info(f"Updating opens for mailshot {mailshot_id}, keys: {set(sent_at_stage.values())}")
         max_stage = max(sent_at_stage.values())
@@ -253,153 +237,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         return opened_indices
 
-    def calculate_s_revised(self, phi, p, f, scheduler_args: CoefSchedulerArgs):
-        # 𝑠𝑗 = 𝛼*𝑝_𝑗 + (1 − 𝛼)*𝑓_𝑗(𝑡)
-        if self.beta_scheduler is None:
-            raise ValueError("Beta scheduler has not been initialized")
-        alpha = self.alpha_scheduler(scheduler_args)
-        beta = self.beta_scheduler(scheduler_args)
 
-        pi = alpha * phi + (1 - alpha) * f
-        u = beta * p + (1 - beta)
-        s = pi * u
-
-        self.u_predictions.append(u.detach().numpy())
-        self.pi_predictions.append(pi.detach().numpy())
-
-        return s
-
-    def calculate_scores(
-        self,
-        user_indices: List[int],
-        sent_indices: List[int],
-        opened: torch.tensor,
-        newly_opened: Set[int],
-        scheduler_args: CoefSchedulerArgs,
-    ) -> torch.Tensor:
-        # Calculate p, f, s
-
-        match self.config.naive_f:
-            case True:
-                fs = self.calculate_f(opened, newly_opened)
-            case False:
-                fs = self.non_naive_f(opened, sent_indices)
-
-        if self.last_p.sum() == 0:
-            ps: torch.tensor = self.calculate_p()
-            self.last_p = ps
-
-            # np.save(ROOT_FOLDER / "additional_data" / "p_scores" / "p_var.npy",
-            #         np.array(self.last_p.detach().numpy(), dtype=np.float64))
-        else:
-            ps: torch.tensor = self.last_p
-
-        popularity: torch.tensor = self.calculate_popularity()
-
-        p_phis = ps * popularity
-
-        match self.config.revised_s:
-            case False:
-                s = self.calculate_s(p_phis, fs, scheduler_args)
-            case True:
-                s = self.calculate_s_revised(popularity, ps, fs, scheduler_args)
-
-        # Sample from Beta distribution
-        samples: torch.tensor = self.calculate_samples(s, self.config.G)
-
-        # Don't consider already sent samples
-        samples[sent_indices] = 0
-
-        # Don't consider users not in user_indices
-        user_mask = self.user_indices_to_mask(user_indices)
-        samples[~user_mask] = 0
-
-        self.pjs_predictions.append(p_phis.detach().numpy())
-        self.fjs_predictions.append(fs.detach().numpy())
-        self.sjs_predictions.append(s.detach().numpy())
-        self.user_mask.append(user_mask.detach().numpy())
-        return samples
-
-    def predict_batch(
-        self,
-        user_indices: List[int],
-        sent_indices: List[int],
-        opened: torch.tensor,
-        n_best: int,
-        newly_opened: Set[int],
-        scheduler_args: CoefSchedulerArgs,
-    ) -> Tuple[List[int], List[float]]:
-        # Calculate p, f, s
-        samples = self.calculate_scores(
-            user_indices, sent_indices, opened, newly_opened, scheduler_args
-        )
-
-        # Select indices of top N samples
-        top_indices: List[int] = torch.topk(samples, n_best).indices.tolist()
-        top_scores: List[float] = samples[top_indices].tolist()
-        return top_indices, top_scores  # Return top N indices as list and their scores
-
-    def user_indices_to_mask(self, user_indices: List[int]) -> torch.tensor:
-        mask = torch.zeros(self.train.num_users, dtype=torch.bool)
-        mask[torch.tensor(user_indices)] = True
-        return mask
-
-    def predict_final_send(
-        self,
-        user_indices: List[int],
-        sent_indices: List[int],
-        opened: torch.tensor,
-        newly_opened: Set[int],
-        scheduler_args: CoefSchedulerArgs,
-    ) -> torch.Tensor:
-        samples = self.calculate_scores(
-            user_indices, sent_indices, opened, newly_opened, scheduler_args
-        )
-        return samples
-
-    def final_metrics(
-        self,
-        mailshot_id: int,
-        dataset: AutoencoderDataset,
-        user_indices: List[int],
-        sent_indices: List[int],
-        final_predictions: torch.Tensor,
-    ) -> List[ContextualBanditMetrics]:
-        binary_results: torch.Tensor = dataset[mailshot_id][
-            1
-        ]  # 1 because the 0 is masked for training
-        prediction = deepcopy(final_predictions)
-
-        # Put 1s for sent_indices
-        prediction[sent_indices] = 1
-
-        # User indices mask
-        user_mask = self.user_indices_to_mask(user_indices)
-
-        # User cluster tensor
-        # user_clusters = self.train.user_clusters.sort_values('user_id')['cluster'].tolist()
-        user_clusters = [0] * self.train.num_users
-
-        # Calculate metrics
-        metrics: List[ContextualBanditMetrics] = ContextualBanditMetrics.from_lists(
-            mailshot_id,
-            user_mask.tolist(),
-            binary_results.tolist(),
-            prediction.tolist(),
-            user_clusters,
-        )
-        return metrics
-
-    def calculate_popularity(self) -> torch.tensor:
-        if not self._template_weight:
-            raise ValueError("No template weight")
-
-        if self._popularity_tensor is None:
-            self._popularity_tensor = self.train.popularity_tensor(
-                self._template_weight
-            )
-
-        return self._popularity_tensor
+# ===== p ===== 
 
     def calculate_p(self) -> torch.Tensor:
         batch_size = 256
@@ -424,52 +263,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             all_variances.append(variances)
 
         all_averages = torch.cat(all_averages)
-
-        max_average_idx = torch.argmax(all_averages)
-        max_average_input = torch.zeros(input_dim)
-        max_average_input[max_average_idx] = 1
-
-        max_average_row = self.autoencoder.predict(max_average_input)
-        # np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "avg.npy",
-        #         np.array(max_average_row.detach().numpy(), dtype=np.float64))
-
         all_variances = torch.cat(all_variances)
-
-        max_var_idx = torch.argmax(all_variances)
-        max_var_input = torch.zeros(input_dim)
-        max_var_input[max_var_idx] = 1
-
-        max_var_row = self.autoencoder.predict(max_var_input)
-        # np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "var.npy",
-        #         np.array(max_var_row.detach().numpy(), dtype=np.float64))
-
-        # ==== ===
-        from scipy.stats import rankdata
-
-        mean_ranking = rankdata(-all_averages, method="min")
-        var_ranking = rankdata(-all_variances, method="min")
-
-        rank_flips = torch.abs(torch.tensor(var_ranking - mean_ranking))
-
-        biggest_rank_flip = torch.argmax(rank_flips)
-        biggest_rank_flip_vec = torch.zeros(self.train.num_users)
-        biggest_rank_flip_vec[biggest_rank_flip] = 1
-
-        sigma_row = self.autoencoder.predict(biggest_rank_flip_vec.unsqueeze(0))
-        np.save(
-            ROOT_FOLDER / "additional_data" / "p_scores" / f"rank_flip_sigma_row.npy",
-            np.array(sigma_row.detach().numpy(), dtype=np.float64),
-        )
-
-        np.save(
-            ROOT_FOLDER / "additional_data" / "p_scores" / f"p_mean.npy",
-            np.array(all_averages.detach().numpy(), dtype=np.float64),
-        )
-
-        np.save(
-            ROOT_FOLDER / "additional_data" / "p_scores" / f"p_var.npy",
-            np.array(4 * all_variances.detach().numpy(), dtype=np.float64),
-        )
 
         match self.config.p_type:
             case "mean":
@@ -481,14 +275,21 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             case _:
                 raise ValueError("Unknown p value")
 
+    def get_p(self) -> torch.Tensor:
+        if self._p_cache is None:
+            self._p_cache = self.calculate_p()
+
+        return self._p_cache
+
+# ===== f =====
+
     def calculate_f(
-        self, results: torch.Tensor, newly_opened: Set[int]
+        self, results: torch.Tensor, newly_opened: set[int]
     ) -> torch.Tensor:
         if results.sum() == 0:
-            self.last_prenormalized_f = torch.zeros_like(results)
+            self._naive_f_partial = torch.zeros_like(results)
             return torch.zeros_like(results)
 
-        # Indices of the results
         f = torch.zeros_like(results, dtype=torch.float)
         for index in newly_opened:
             user = torch.zeros_like(results)
@@ -501,15 +302,13 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 ).squeeze(0)
             f += current_f
 
-        self.last_prenormalized_f += f
-        normalized_f = self.last_prenormalized_f / sum(results)
-        if self.config.flipped:
-            return torch.ones(normalized_f.shape) - normalized_f
-        else:
-            return normalized_f
+        self._naive_f_partial += f
+        normalized_f = self._naive_f_partial / sum(results)
+
+        return normalized_f
 
     def non_naive_f(
-        self, results: torch.Tensor, sent_indices: List[int]
+        self, results: torch.Tensor, sent_indices: list[int]
     ) -> torch.Tensor:
 
         if not self.config.double_sae:
@@ -534,19 +333,205 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         return current_f
 
+    def get_f(self, opened, newly_opened, sent_indices: list[int]) -> torch.Tensor:
+        match self.config.naive_f:
+            case True:
+                return self.calculate_f(opened, newly_opened)
+            case False:
+                return self.non_naive_f(opened, sent_indices)
+
+# ===== s =====
+
     def calculate_s(
-        self, p: torch.Tensor, f: torch.Tensor, scheduler_args: CoefSchedulerArgs
+        self, phi: torch.Tensor, p: torch.Tensor, f: torch.Tensor, scheduler_args: CoefSchedulerArgs
     ) -> torch.Tensor:
         s = (
-            self.alpha_scheduler(scheduler_args) * p
+            self.alpha_scheduler(scheduler_args) * phi * p
             + (1 - self.alpha_scheduler(scheduler_args)) * f
         )
         return s
 
+    def calculate_s_revised(self, phi, p, f, scheduler_args: CoefSchedulerArgs):
+        # 𝑠𝑗 = 𝛼*𝑝_𝑗 + (1 − 𝛼)*𝑓_𝑗(𝑡)
+        if self.beta_scheduler is None:
+            raise ValueError("Beta scheduler has not been initialized")
+        alpha = self.alpha_scheduler(scheduler_args)
+        beta = self.beta_scheduler(scheduler_args)
+
+        pi = alpha * phi + (1 - alpha) * f
+        u = beta * p + (1 - beta)
+        s = pi * u
+
+        return s
+
+    def get_s(self, phi: torch.Tensor, p: torch.Tensor, f: torch.Tensor, scheduler_args: CoefSchedulerArgs) -> torch.Tensor:
+        match self.config.revised_s:
+            case False:
+                return self.calculate_s(phi, p, f, scheduler_args)
+            case True:
+                return self.calculate_s_revised(phi, p, f, scheduler_args)
+
+# ===== phi =====
+
+    def get_phi(self) -> torch.Tensor:
+        if not self._template_weight:
+            raise ValueError("No template weight")
+
+        if self._phi_cache is None:
+            self._phi_cache = self.train.popularity_tensor(
+                self._template_weight
+            )
+
+        return self._phi_cache
+
+# ===== TS MAB =====
+
+    def calculate_scores(
+        self,
+        user_indices: list[int],
+        sent_indices: list[int],
+        opened: torch.Tensor,
+        newly_opened: set[int],
+        scheduler_args: CoefSchedulerArgs,
+    ) -> torch.Tensor:
+
+        f: torch.Tensor = self.get_f(opened, newly_opened, sent_indices)
+        p: torch.Tensor = self.get_p()
+        phi: torch.Tensor = self.get_phi()
+
+        s: torch.Tensor = self.get_s(phi, p, f, scheduler_args)
+
+        samples: torch.tensor = self.calculate_samples(s, self.config.G)
+        samples[sent_indices] = 0
+
+        user_mask = self.user_indices_to_mask(user_indices)
+        samples[~user_mask] = 0
+        self.user_mask.append(user_mask.detach().numpy())
+
+        return samples
+
+    def predict_batch(
+        self,
+        user_indices: list[int],
+        sent_indices: list[int],
+        opened: torch.tensor,
+        n_best: int,
+        newly_opened: set[int],
+        scheduler_args: CoefSchedulerArgs,
+    ) -> tuple[list[int], list[float]]:
+        # Calculate p, f, s
+        samples = self.calculate_scores(
+            user_indices, sent_indices, opened, newly_opened, scheduler_args
+        )
+
+        # Select indices of top N samples
+        top_indices: list[int] = torch.topk(samples, n_best).indices.tolist()
+        top_scores: list[float] = samples[top_indices].tolist()
+        return top_indices, top_scores  # Return top N indices as list and their scores
+
+    def user_indices_to_mask(self, user_indices: list[int]) -> torch.tensor:
+        mask = torch.zeros(self.train.num_users, dtype=torch.bool)
+        mask[torch.tensor(user_indices)] = True
+        return mask
+
+    def predict_final_send(
+        self,
+        user_indices: list[int],
+        sent_indices: list[int],
+        opened: torch.tensor,
+        newly_opened: set[int],
+        scheduler_args: CoefSchedulerArgs,
+    ) -> torch.Tensor:
+        samples = self.calculate_scores(
+            user_indices, sent_indices, opened, newly_opened, scheduler_args
+        )
+        return samples
+
+    def final_metrics(
+        self,
+        mailshot_id: int,
+        dataset: AutoencoderDataset,
+        user_indices: list[int],
+        sent_indices: list[int],
+        final_predictions: torch.Tensor,
+    ) -> list[ContextualBanditMetrics]:
+        binary_results: torch.Tensor = dataset[mailshot_id][
+            1
+        ]  # 1 because the 0 is masked for training
+        prediction = deepcopy(final_predictions)
+
+        # Put 1s for sent_indices
+        prediction[sent_indices] = 1
+
+        # User indices mask
+        user_mask = self.user_indices_to_mask(user_indices)
+
+        # User cluster tensor
+        # user_clusters = self.train.user_clusters.sort_values('user_id')['cluster'].tolist()
+        user_clusters = [0] * self.train.num_users
+
+        # Calculate metrics
+        metrics: list[ContextualBanditMetrics] = ContextualBanditMetrics.from_lists(
+            mailshot_id,
+            user_mask.tolist(),
+            binary_results.tolist(),
+            prediction.tolist(),
+            user_clusters,
+        )
+        return metrics
+
     @staticmethod
     def calculate_samples(s: torch.Tensor, G: float) -> torch.Tensor:
-        # logger.info("Calculating samples")
         alphas = torch.clamp(s * G, min=1e-12)
         betas = torch.clamp((1 - s) * G, min=1e-12)
         samples = torch.distributions.Beta(alphas, betas).sample()
         return samples
+
+
+# ===== Additional =====
+
+def max_p_sigma_rows(autoencoder: ShallowAutoencoder, all_averages: torch.Tensor, all_variances: torch.Tensor) -> None:
+    max_average_idx = torch.argmax(all_averages)
+    max_average_input = torch.zeros(autoencoder.n)
+    max_average_input[max_average_idx] = 1
+
+    max_average_row = autoencoder.predict(max_average_input)
+    np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "avg.npy",
+            np.array(max_average_row.detach().numpy(), dtype=np.float64))
+
+    max_var_idx = torch.argmax(all_variances)
+    max_var_input = torch.zeros(autoencoder.n)
+    max_var_input[max_var_idx] = 1
+
+    max_var_row = autoencoder.predict(max_var_input)
+    np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "var.npy",
+            np.array(max_var_row.detach().numpy(), dtype=np.float64))
+
+
+def max_p_rank_flip_sigma_row(autoencoder: ShallowAutoencoder, all_averages: torch.Tensor, all_variances: torch.Tensor):
+    from scipy.stats import rankdata
+    
+    mean_ranking = rankdata(-all_averages, method="min")
+    var_ranking = rankdata(-all_variances, method="min")
+
+    rank_flips = torch.abs(torch.tensor(var_ranking - mean_ranking))
+
+    biggest_rank_flip = torch.argmax(rank_flips)
+    biggest_rank_flip_vec = torch.zeros(autoencoder.n)
+    biggest_rank_flip_vec[biggest_rank_flip] = 1
+
+    sigma_row = autoencoder.predict(biggest_rank_flip_vec.unsqueeze(0))
+    np.save(
+        ROOT_FOLDER / "additional_data" / "p_scores" / f"rank_flip_sigma_row.npy",
+        np.array(sigma_row.detach().numpy(), dtype=np.float64),
+    )
+
+    np.save(
+        ROOT_FOLDER / "additional_data" / "p_scores" / f"p_mean.npy",
+        np.array(all_averages.detach().numpy(), dtype=np.float64),
+    )
+
+    np.save(
+        ROOT_FOLDER / "additional_data" / "p_scores" / f"p_var.npy",
+        np.array(4 * all_variances.detach().numpy(), dtype=np.float64),
+    )

@@ -10,7 +10,7 @@ from email_outreach.utils.data_loader_utils import load_data_for_sender
 
 logger = logging.getLogger(__name__)
 
-from email_outreach.ml.shallow_autoencoder.dataset.template_weight import (
+from email_outreach.ml.shallow_autoencoder.template_weight import (
     AbstractTemplateWeight,
 )
 
