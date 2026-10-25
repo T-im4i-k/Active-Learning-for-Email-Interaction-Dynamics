@@ -4,11 +4,7 @@ import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from pathlib import Path
-from typing import (
-    Any,
-    Sequence,
-    Type,
-)
+from typing import Any, Sequence, Type
 
 import numpy as np
 import pandas as pd
@@ -16,18 +12,12 @@ from joblib import Parallel, delayed
 from sklearn.model_selection import ParameterSampler
 
 from email_outreach.experiment_utils.experiment_constants import (
-    EXPERIMENT_RESULTS_FOLDER_NAME,
-    get_experiment_folder_path,
-    get_test_folder_path,
-)
-from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
-    AutoencoderDataset,
-)
-
+    EXPERIMENT_RESULTS_FOLDER_NAME, get_experiment_folder_path,
+    get_test_folder_path)
 from email_outreach.ml.shallow_autoencoder.config import (
-    ContextualBanditMetrics,
-    ContextualBanditWithAutoencoderConfig,
-)
+    ContextualBanditMetrics, ContextualBanditWithAutoencoderConfig)
+from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import \
+    AutoencoderDataset
 
 logger = logging.getLogger(__name__)
 

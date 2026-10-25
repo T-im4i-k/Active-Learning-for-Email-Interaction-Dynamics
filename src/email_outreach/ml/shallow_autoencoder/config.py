@@ -1,14 +1,11 @@
+import csv
+import gzip
+import json
 from dataclasses import dataclass, field
-
-from typing import Any, Self, Literal
-
 from pathlib import Path
+from typing import Any, Literal, Self
 
 import pandas as pd
-
-import gzip
-import csv
-import json
 
 
 @dataclass
