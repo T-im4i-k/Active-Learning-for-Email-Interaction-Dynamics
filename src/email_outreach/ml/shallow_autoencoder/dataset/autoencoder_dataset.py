@@ -48,14 +48,9 @@ class AutoencoderDataset(Dataset):
         self._mails_to_tto_data()
         self._user_clusters: Optional[pd.DataFrame] = None
         self._training_mask_recalc = 0
-        logger.info(
-            f"Dataset created with {len(self)} mailshots and {self.num_users} users"
-        )
+
         self.min_template_id: int = self.mails["mailshot_id"].min()
         self.max_template_id: int = self.mails["mailshot_id"].max()
-
-        print(f"=== min_id: {self.min_template_id} ===")
-        print(f"=== max_id: {self.max_template_id} ===")
 
     @property
     def num_users(self) -> int:

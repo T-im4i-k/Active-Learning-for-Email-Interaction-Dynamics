@@ -19,10 +19,6 @@ class AbstractTemplateWeight(ABC):
 class ExponentialTemplateWeight(AbstractTemplateWeight):
     def __init__(self, min_template_id: int, max_template_id: int, half_life: float) -> None:
         super().__init__(min_template_id, max_template_id)
-
-        # if not 0 < half_life <= 1:
-        #     raise ValueError("Half life is out of bounds")
-
         self.half_life: float = half_life
 
     def _raw_weight(self, template_id: int) -> float:

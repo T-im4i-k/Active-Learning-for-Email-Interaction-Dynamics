@@ -2,8 +2,6 @@ import argparse
 import datetime
 import json
 import logging
-import re
-import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -11,14 +9,7 @@ from email_outreach.experiment_utils.experiment_constants import (
     GRID_SEARCH_FILE_NAME,
     get_experiment_folder_path,
 )
-from email_outreach.ml.baselines.ddqn_linkedin import DoubleDQNTrainer
-from email_outreach.ml.baselines.factor_ucb import FactorUCBModel
-from email_outreach.ml.baselines.fmfcdb import FMFCDBModel
-from email_outreach.ml.baselines.fmpsal import FMPSALModel
-from email_outreach.ml.baselines.fmrsal import FMRSALModel
-from email_outreach.ml.baselines.model_based_rl import ModelBasedRL
-from email_outreach.ml.baselines.random_model import RandomModel
-from email_outreach.ml.baselines.thompson_sampling import ThompsonSamplingModel
+
 from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
     ContextualBanditWithAutoencoder,
 )
@@ -28,28 +19,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-
-
-def get_model_class(model_name: str):
-    """Get the model class for the specified model name."""
-    model_classes = {
-        "fmrsal": FMRSALModel,
-        "fmpsal": FMPSALModel,
-        "fmfcdb": FMFCDBModel,
-        "ddqn": DoubleDQNTrainer,
-        "thompson_sampling": ThompsonSamplingModel,
-        "random": RandomModel,
-        "contextual_bandit": ContextualBanditWithAutoencoder,
-        "model_based_rl": ModelBasedRL,
-        "factor_ucb": FactorUCBModel,
-    }
-
-    if model_name not in model_classes:
-        raise ValueError(
-            f"Unknown model: {model_name}. Available models: {list(model_classes.keys())}"
-        )
-
-    return model_classes[model_name]
 
 
 def load_config(
@@ -167,7 +136,7 @@ def main():
         # Auto-generate the timestamp-based version if not provided
         logger.info(f"Using auto-generated timestamp version: {version}")
 
-    model_class = get_model_class(model_name)
+    model_class = ContextualBanditWithAutoencoder
     results_folder = get_experiment_folder_path(
         sender_id, model_class.model_name(), version
     )

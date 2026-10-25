@@ -3,7 +3,6 @@ import itertools
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)

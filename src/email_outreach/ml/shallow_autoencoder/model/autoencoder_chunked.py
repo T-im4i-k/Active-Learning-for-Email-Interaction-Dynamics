@@ -1,19 +1,13 @@
 import logging
-import math
 from dataclasses import dataclass
-from typing import List, Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.init as init
 import torch.optim as optim
-from matplotlib import pyplot as plt
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+from torch.utils.data import DataLoader, Dataset
 
 from email_outreach.utils.common_utils import set_seed
-
-from typing import OrderedDict
-import numpy as np
 
 # References:
 # - Sedhain S. et al., "AutoRec: Autoencoders Meet Collaborative Filtering," WWW 2015.
@@ -26,274 +20,18 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TrainingMetrics:
     loss: float
-    average_train_ndcg: Optional[float]
-    average_ndcg: Optional[float]
-    average_f1: Optional[float]
-    recall: Optional[float]
-    precision: Optional[float]
-    val_loss: Optional[float]
-    val_average_ndcg: Optional[float]
-    val_average_f1: Optional[float]
-    val_average_iou: Optional[float]
-
-    def __post_init__(self):
-        # print(f"TrainingMetrics: {self}")
-        pass
+    average_train_ndcg: float | None
+    average_ndcg: float | None
+    average_f1: float | None
+    recall: float | None
+    precision: float | None
+    val_loss: float | None
+    val_average_ndcg: float | None
+    val_average_f1: float | None
+    val_average_iou: float | None
 
     def __str__(self):
         return f"loss: {self.loss:.4f}, val (masked) NDCG: {self.average_ndcg:.4f}, val (masked) f1: {self.average_f1:.4f}, val loss: {self.val_loss:.4f}, val NDCG: {self.val_average_ndcg:.4f}, val f1: {self.val_average_f1:.4f}"
-        # return f"loss: {self.loss:.4f}, recall: {self.recall:.4f}, precision: {self.precision:.4f}, val_loss: {self.val_loss:.4f}, val_recall: {self.val_recall:.4f}, val_precision: {self.val_precision:.4f}"
-
-    @staticmethod
-    def plot_average_train_ndcg(results: List["TrainingMetrics"]):
-        average_ndcg = [result.average_train_ndcg for result in results]
-        print(f"Max average_ndcg: {max(average_ndcg):.4f}")
-        print(f"End average_ndcg: {average_ndcg[-1]:.4f}")
-        plt.plot(average_ndcg, label="average_ndcg")
-        plt.legend()
-        plt.xlabel("Epoch")
-        plt.ylabel("NDCG")
-        plt.show()
-
-    @staticmethod
-    def plot_val_precision_recall(results: List["TrainingMetrics"]):
-        val_precision = [result.val_precision for result in results]
-        val_recall = [result.val_recall for result in results]
-        print(
-            f"Max val_precision: {max(val_precision):.4f}, Max val_recall: {max(val_recall):.4f}"
-        )
-        print(
-            f"End val_precision: {val_precision[-1]:.4f}, End val_recall: {val_recall[-1]:.4f}"
-        )
-        print(
-            f"Loss at max val_precision: {results[val_precision.index(max(val_precision))].val_loss:.4f}"
-        )
-        plt.plot(val_precision, label="val_precision")
-        plt.plot(val_recall, label="val_recall")
-        plt.legend()
-        plt.show()
-
-    @staticmethod
-    def plot_average_ndcg(results: List["TrainingMetrics"]):
-        average_ndcg = [result.average_ndcg for result in results]
-        print(f"Max average_ndcg: {max(average_ndcg):.4f}")
-        print(f"End average_ndcg: {average_ndcg[-1]:.4f}")
-        plt.plot(average_ndcg, label="average_ndcg")
-        plt.legend()
-        plt.xlabel("Epoch")
-        plt.ylabel("NDCG")
-        plt.show()
-
-    @staticmethod
-    def plot_f1_score(results: List["TrainingMetrics"]):
-        f1 = [result.average_f1 for result in results]
-        print(f"Max f1: {max(f1):.4f}")
-        print(f"End f1: {f1[-1]:.4f}")
-        plt.plot(f1, label="f1")
-        plt.xlabel("Epoch")
-        plt.ylabel("F1 Score")
-        plt.legend()
-        plt.show()
-
-    @staticmethod
-    def plot_val_f1_score(results: List["TrainingMetrics"]):
-        f1 = [result.val_average_f1 for result in results]
-        print(f"Max f1: {max(f1):.4f}")
-        print(f"End f1: {f1[-1]:.4f}")
-        plt.plot(f1, label="f1")
-        plt.xlabel("Epoch")
-        plt.ylabel("F1 Score")
-        plt.legend()
-        plt.show()
-
-    @staticmethod
-    def plot_val_loss(results: List["TrainingMetrics"]):
-        val_loss = [result.val_loss for result in results]
-        print(f"Min val_loss: {min(val_loss):.4f}")
-        print(f"End val_loss: {val_loss[-1]:.4f}")
-        plt.plot(val_loss, label="val_loss")
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.legend()
-        plt.show()
-
-    @staticmethod
-    def plot_val_ndcg(results: List["TrainingMetrics"]):
-        val_ndcg = [result.val_average_ndcg for result in results]
-        print(f"Max val_ndcg: {max(val_ndcg):.4f}")
-        print(f"End val_ndcg: {val_ndcg[-1]:.4f}")
-        plt.plot(val_ndcg, label="val_ndcg")
-        plt.xlabel("Epoch")
-        plt.ylabel("NDCG")
-        plt.legend()
-        plt.show()
-
-    @staticmethod
-    def plot_train_and_val_loss(results: List["TrainingMetrics"]):
-        train_loss = [result.loss.detach().numpy() for result in results]
-        val_loss = [result.val_loss.detach().numpy() for result in results]
-        print(f"Min val_loss: {min(val_loss):.4f}")
-        print(f"End val_loss: {val_loss[-1]:.4f}")
-        plt.plot(train_loss, label="train_loss")
-        plt.plot(val_loss, label="val_loss")
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.legend()
-        plt.show()
-
-
-class DeepAutoencoder(nn.Module):
-    def __init__(
-            self, n: int, d: int, dropout_p=0.0,
-    ):
-        super().__init__()
-
-        self.encoder = nn.Sequential(
-            OrderedDict([
-                ("encoder_l1", nn.Linear(in_features=n, out_features=2 * d)),
-                ("encoder_dropout1", nn.Dropout(p=dropout_p)),
-                ("encoder_relu1", nn.ReLU()),
-                ("encoder_l2", nn.Linear(in_features=2 * d, out_features=d))
-            ])
-        )
-
-        # nn.init.xavier_uniform_(self.encoder.weight)
-
-        self.dropout = nn.Dropout(p=dropout_p)
-        self.norm = nn.LayerNorm(d)
-
-        self.decoder = nn.Sequential(
-            OrderedDict([
-                ("decoder_l1", nn.Linear(in_features=d, out_features=2 * d)),
-                ("decoder_dropout1", nn.Dropout(p=dropout_p)),
-                ("decoder_relu1", nn.ReLU()),
-                ("decoder_l2", nn.Linear(in_features=2 * d, out_features=n))
-            ])
-        )
-
-        # nn.init.xavier_uniform_(self.decoder.weight)
-
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, X):
-        X = self.encoder(X)
-        X = self.dropout(X)
-        X = self.norm(X)
-        X = self.decoder(X)
-        return self.sigmoid(X)
-
-    def forward_for_user(self, x):
-        return self.forward(x)
-
-    def predict(self, X):
-        self.eval()
-        with torch.no_grad():
-            return self.forward(X)
-
-    def predict_for_user(self, X):
-        self.eval()
-        with torch.no_grad():
-            return self.forward_for_user(X)
-
-    def fit_improved(
-            self,
-            train: Dataset,
-            val: Dataset,
-            epochs,
-            lr,
-            batch_size,
-            weight_decay,
-            positive_weight,
-            positive_threshold,
-    ):
-        train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val, batch_size=batch_size, shuffle=False)
-
-        optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
-        scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
-        criterion = nn.BCELoss(reduction="none")
-
-        for epoch in range(epochs):
-            self.train()
-            train_loss = 0.0
-            train_samples = 0
-            for batch_data, target_data in train_loader:
-                optimizer.zero_grad()
-
-                reconstruction = self.forward(batch_data)
-                loss = criterion(reconstruction, target_data)
-
-                weights = torch.where(
-                    target_data > positive_threshold,
-                    positive_weight,
-                    1,
-                )
-                weighted_loss = loss * weights
-
-                # Mean loss for this batch, used for optimization
-                batch_loss = weighted_loss.mean()
-                batch_loss.backward()
-                optimizer.step()
-
-                train_loss += weighted_loss.sum().item()
-                train_samples += target_data.numel()
-
-            train_loss /= train_samples
-
-            # Validation
-            self.eval()
-            val_loss = 0.0
-            val_samples = 0
-
-            with torch.no_grad():
-                for batch_data, target_data in val_loader:
-                    reconstruction = self.forward(batch_data)
-                    loss = criterion(reconstruction, target_data)
-
-                    weights = torch.where(
-                        target_data > positive_threshold,
-                        positive_weight,
-                        1,
-                    )
-                    weighted_loss = loss * weights
-
-                    val_loss += weighted_loss.sum().item()
-                    val_samples += target_data.numel()
-
-            val_loss /= val_samples
-
-            scheduler.step()
-
-            print(
-                f"=== Epoch {epoch} | "
-                f"Train loss: {train_loss:.6f} | "
-                f"Val loss: {val_loss:.6f} ==="
-            )
-
-    def fit(
-            self,
-            train: Dataset,
-            epochs=10,
-            lr=1e-3,
-            batch_size=1024,
-            weight_decay=1e-4,
-            positive_weight=5.0,
-            label_smoothing=0.0,
-            val: Dataset | torch.Tensor = None,
-            positive_threshold: float = 0.5,
-    ):
-
-        return self.fit_improved(
-            train=train,
-            val=val,
-            epochs=epochs,
-            lr=lr,
-            batch_size=batch_size,
-            weight_decay=weight_decay,
-            positive_weight=positive_weight,
-            positive_threshold=positive_threshold
-        )
-
 
 class ShallowAutoencoder(nn.Module):
     """
@@ -311,88 +49,36 @@ class ShallowAutoencoder(nn.Module):
     """
 
     def __init__(
-            self, n: int, d: int, popularity: torch.Tensor, device: str = None, layer_norm=False, dropout_p=0.1,
-            bias: bool = False,
+            self, n: int, d: int,  dropout_p=0.1,
     ):
         super().__init__()
         self.E = nn.Parameter(torch.empty(n, d))
         self.D = nn.Parameter(torch.empty(n, d))
 
-        self.bias = bias
-
-        if self.bias:
-            self.bias_param = nn.Parameter(torch.empty(n))
-            init.zeros_(self.bias_param)
-            # bias_init = torch.logit(popularity, eps = 1e-6)
-            # self.bias_param.copy_(bias_init)
-
-        # Use Xavier (Glorot) initialization to avoid outputs hovering around 0.5
         init.xavier_uniform_(self.E)
         init.xavier_uniform_(self.D)
 
         self.dropout = nn.Dropout(p=dropout_p)
-
-        # BatchNorm1d applied after the hidden layer
-        if layer_norm:
-            logger.info("Using LayerNorm")
-            self.bn = nn.LayerNorm(d)
-        else:
-            logger.info("Using BatchNorm1d")
-            self.bn = nn.BatchNorm1d(d)
-        # self.dropout = nn.Dropout(p=dropout_p)
-        #
-        self.register_buffer("x_min", torch.tensor(0.0))
-        self.register_buffer("x_max", torch.tensor(0.0))
-        if device != "cpu":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-            self.device = "cpu"
-        else:
-            self.device = "cpu"
-
-        self.training_metrics = []
+        self.bn = nn.LayerNorm(d)
 
     def logit(self, X):
-        diag_vals = (self.E * self.D).sum(dim=1)  # * np.sqrt(1.0 / self.D.size(1))
+        diag_vals = (self.E * self.D).sum(dim=1)
         hidden = X @ self.E
 
-        # Apply normalization
         hidden = self.bn(hidden)
         hidden = self.dropout(hidden)
 
         out = hidden @ self.D.t()
         out = out - (X * diag_vals)
-        if self.bias:
-            out = out + self.bias_param
-        return out
 
-    def logit_for_user(self, X):
-        diag_vals = (self.E * self.D).sum(dim=1)
-        hidden = X @ self.E
-        out = hidden @ self.D.t()
-        out = out - (X * diag_vals)
-        if self.bias:
-            out = out + self.bias_param
         return out
 
     def forward(self, X):
-        """
-        This function assumes the input X is a batch of data. It will be multiplied by E and D to get the hidden layer.
-        :param X: torch.Tensor of shape [batch_size, n]
-        :return: torch.Tensor of shape [batch_size, n] -> this should represent the reconstruction of the input.
-        """
         out = self.logit(X)
         return torch.sigmoid(out)
+    
 
-    def forward_for_user(self, X):
-        """
-        This function assumes there will be only 1 user in the input X. Exactly one 1 and roughly 100k 0s.
-        :param X: torch.Tensor of shape [1, n]
-        :return: torch.Tensor of shape [1, n] -> this should represent how predictive this user is for each user.
-        """
-        out = self.logit_for_user(X)
-        return torch.sigmoid(out)
-
-    def fit_improved(
+    def fit(
             self,
             train: Dataset,
             val: Dataset,
@@ -401,7 +87,6 @@ class ShallowAutoencoder(nn.Module):
             batch_size,
             weight_decay,
             positive_weight,
-            positive_threshold,
     ):
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
         optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
@@ -411,133 +96,25 @@ class ShallowAutoencoder(nn.Module):
         for epoch in range(epochs):
             self.train()
             for batch_data, target_data in train_loader:
-                # print(f"=={batch_data.mean()=}==")
-                # print(f"=={target_data.mean()=}==")
                 optimizer.zero_grad()
 
                 reconstruction = self.forward(batch_data)
-
                 loss = criterion(reconstruction, target_data)
 
-                weights = torch.where(target_data > positive_threshold, positive_weight, 1)
+                weights = torch.where(target_data > 0, positive_weight, 1)
                 loss.backward(weights)
                 optimizer.step()
             scheduler.step()
 
         return self.training_metrics
 
-    def fit(
-            self,
-            train: Dataset,
-            epochs=10,
-            lr=1e-3,
-            batch_size=1024,
-            weight_decay=1e-4,
-            positive_weight=5.0,
-            label_smoothing=0.0,
-            val: Dataset | torch.Tensor = None,
-            positive_threshold: float = 0.5,
-    ):
-
-        return self.fit_improved(
-            train=train,
-            val=val,
-            epochs=epochs,
-            lr=lr,
-            batch_size=batch_size,
-            weight_decay=weight_decay,
-            positive_weight=positive_weight,
-            positive_threshold=positive_threshold
-        )
-
     def predict(self, X):
         self.eval()
         with torch.no_grad():
-            X = X.to(self.device)
-            reconstruction = self.forward(X)
+            return self.forward(X)
         return reconstruction
 
     def predict_logit(self, X):
         self.eval()
         with torch.no_grad():
-            X = X.to(self.device)
-            reconstruction = self.logit(X)
-        return reconstruction
-
-    def predict_for_user(self, X):
-        self.eval()
-        with torch.no_grad():
-            X = X.to(self.device)
-            reconstruction = self.forward_for_user(X)
-        return reconstruction
-
-
-def compute_batch_ndcg(batch_data, val_data, reconstruction, k=None):
-    """
-    Computes NDCG on the 'missing' entries indicated by mask = val_data - batch_data.
-    """
-    # mask > 0 indicates data that was not present in batch_data but present in val_data
-    mask = ~batch_data.bool()
-
-    # Predictions and ground truth only for masked positions
-    pred = reconstruction[mask]
-    true = val_data[mask]
-
-    # If there are no masked entries, return 0.0 to avoid errors
-    if pred.numel() == 0:
-        return 0.0
-
-    # Sort by predicted relevance in descending order
-    sorted_indices = torch.argsort(pred, descending=True)
-    sorted_true = true[sorted_indices]
-
-    # If k is not specified or exceeds the number of items, use all available masked entries
-    if (k is None) or (k > sorted_true.numel()):
-        k = sorted_true.numel()
-
-    # Calculate DCG
-    dcg = 0.0
-    for i in range(k):
-        rel_i = sorted_true[i].item()
-        dcg += (2 ** rel_i - 1) / math.log2(i + 2)  # i+2 because log2(1+1) for first item
-
-    # Calculate IDCG by sorting the true relevances in descending order
-    sorted_true_ideal = torch.sort(true, descending=True).values
-    ideal_k = min(k, sorted_true_ideal.numel())
-    idcg = 0.0
-    for i in range(ideal_k):
-        rel_i = sorted_true_ideal[i].item()
-        idcg += (2 ** rel_i - 1) / math.log2(i + 2)
-
-    ndcg = dcg / idcg if idcg > 0 else 0.0
-    return ndcg
-
-
-def compute_batch_f1(batch_data, val_data, reconstruction, threshold=0.5):
-    """
-    Computes the F1 score on the 'missing' entries indicated by mask = val_data - batch_data.
-    Assumes binary relevance (predicted/ground_truth > threshold = 1, otherwise 0).
-    """
-    # Identify mask
-    mask = ~batch_data.bool()
-
-    # If nothing is masked, return 0.0 to avoid division by zero
-    if not mask.any():
-        return 0.0
-
-    # Predicted labels and ground truth labels at masked positions
-    pred = (reconstruction[mask] >= threshold).float()
-    true = (val_data[mask] >= threshold).float()
-
-    # Compute true positives, false positives, and false negatives
-    tp = (pred * true).sum()
-    fp = (pred * (1 - true)).sum()
-    fn = ((1 - pred) * true).sum()
-
-    # Compute precision and recall
-    precision = tp / (tp + fp + 1e-12)
-    recall = tp / (tp + fn + 1e-12)
-
-    # Compute F1
-    f1 = 2 * precision * recall / (precision + recall + 1e-12)
-    return f1.item()
+            return self.logit(X)

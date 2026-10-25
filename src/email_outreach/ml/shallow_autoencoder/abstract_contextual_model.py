@@ -33,56 +33,38 @@ from email_outreach.experiment_utils.experiment_constants import (
 from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
     AutoencoderDataset,
 )
-from email_outreach.ml.shallow_autoencoder.metrics.abstract_metrics import (
-    AbstractMetrics,
-)
-from email_outreach.ml.shallow_autoencoder.metrics.default_metrics import DefaultMetrics
 
-TConfig = TypeVar("TConfig", bound="AbstractConfig")
 logger = logging.getLogger(__name__)
 
-
 @dataclass
-class ContextualBanditMetrics(AbstractMetrics):
+class ContextualBanditMetrics:
+    mailshot_id: int
+    opened: bool
+    prediction: float
+
     present_in_prediction: bool
-    user_cluster: int = None
     stage: int = -1
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "mailshot_id": (
                 int(self.mailshot_id)
-                if hasattr(self.mailshot_id, "item")
-                else self.mailshot_id
             ),
             "present_in_prediction": bool(self.present_in_prediction),
             "opened": bool(self.opened),
             "prediction": (
                 float(self.prediction)
-                if hasattr(self.prediction, "item")
-                else self.prediction
             ),
-            "user_cluster": (
-                int(self.user_cluster)
-                if self.user_cluster is not None and hasattr(self.user_cluster, "item")
-                else self.user_cluster
-            ),
-            "stage": int(self.stage) if hasattr(self.stage, "item") else self.stage,
+            "stage": int(self.stage),
         }
 
     @staticmethod
-    def _to_bool(value: str | int | bool | None) -> bool:
-        """Convert various truthy / falsy representations to bool."""
-        if isinstance(value, bool):
-            return value
-        return str(value).strip().lower() in ("1", "true", "batch", "yes", "y")
-
-    @staticmethod
-    def _to_int_or_none(value: str | None) -> Optional[int]:
-        """Return an int unless the value is empty / None / 'None'."""
-        if value in ("", None, "None"):
-            return None
-        return int(value)
+    def to_csv_gz(
+        metrics: List, folder: Path, filename: str = "results.csv.gz"
+    ) -> None:
+        metrics_dicts = [m.to_dict() for m in metrics]
+        df = pd.DataFrame(metrics_dicts)
+        df.to_csv(folder / filename, compression="gzip", index=False)
 
     @classmethod
     def from_csv_gz(cls, folder: Path, filename: str = "results.csv.gz") -> List[Self]:
@@ -102,30 +84,15 @@ class ContextualBanditMetrics(AbstractMetrics):
 
         with gzip.open(path, mode="rt", newline="") as fh:  # text mode
             reader = csv.DictReader(fh)
-
-            # Quick sanity-check
-            required = {
-                "mailshot_id",
-                "opened",
-                "prediction",
-            }
-            missing = required - set(reader.fieldnames or [])
-            if missing:
-                raise ValueError(
-                    f"CSV is missing required columns: {', '.join(missing)}"
-                )
-
-            # Build objects
             for row in reader:
                 instances.append(
                     cls(
                         mailshot_id=int(row["mailshot_id"]),
-                        present_in_prediction=cls._to_bool(
+                        present_in_prediction=bool(
                             row["present_in_prediction"]
                         ),
-                        opened=cls._to_bool(row["opened"]),
+                        opened=bool(row["opened"]),
                         prediction=float(row["prediction"]),
-                        user_cluster=cls._to_int_or_none(row.get("user_cluster")),
                         stage=(
                             int(row["stage"])
                             if row.get("stage") not in ("", None, "None")
@@ -152,18 +119,6 @@ class ContextualBanditMetrics(AbstractMetrics):
             )
         ]
 
-    @classmethod
-    def from_dataframe(cls, df: pd.DataFrame) -> List[Self]:
-        return [
-            cls(
-                row.mailshot_id,
-                row.opened,
-                row.prediction,
-                row.present_in_prediction,
-                row.user_cluster,
-            )
-            for _, row in df.iterrows()
-        ]
 
 
 @dataclass
@@ -185,7 +140,7 @@ class AbstractConfig(ABC):
 
 class AbstractContextualModel(ABC):
 
-    def __init__(self, config: TConfig):
+    def __init__(self, config):
         self.config = config
         self._train = None
         self._val = None
@@ -214,15 +169,16 @@ class AbstractContextualModel(ABC):
     @classmethod
     @abstractmethod
     def model_name(cls) -> str:
-        pass
+        raise NotImplementedError
 
     @classmethod
     def config_class(cls) -> Type[AbstractConfig]:
         return AbstractConfig
 
     @classmethod
-    def metrics_class(cls) -> Type[AbstractMetrics]:
-        return DefaultMetrics
+    @abstractmethod
+    def metrics_class(cls) -> Type[ContextualBanditMetrics]:
+        raise NotImplementedError
 
     @classmethod
     def test(
@@ -413,7 +369,7 @@ class AbstractContextualModel(ABC):
         cls.metrics_class().to_csv_gz(metrics, folder=exp_folder)
 
         # Calculate score
-        score = AbstractContextualModel.calculate_partial_auc(metrics, k_min=0.0, k_max=1.0)
+        score = AbstractContextualModel.calculate_auc(metrics)
 
         # Calculate additional metrics
         _, recalls, precisions = cls.calculate_recall_precision_at_quantiles(
@@ -556,64 +512,34 @@ class AbstractContextualModel(ABC):
         sent_pct = (1.0 - q).tolist()
         return sent_pct, final_rec.tolist(), final_prec.tolist()
 
-    @staticmethod
-    def calculate_partial_auc(
-            metrics: List["AbstractMetrics"],
-            k_min: float = 0.0,
-            k_max: float = 1.0,
-    ) -> float:
-        if not (0.0 <= k_min < k_max <= 1.0):
-            raise ValueError(f"Require 0 <= k_min < k_max <= 1, got k_min={k_min}, k_max={k_max}")
+@staticmethod
+def calculate_auc(metrics: List["AbstractMetrics"]) -> float:
+    by_mailshot = defaultdict(list)
+    for m in metrics:
+        if not m.present_in_prediction:
+            continue
+        by_mailshot[m.mailshot_id].append(m)
 
-        by_mailshot = defaultdict(list)
-        for m in metrics:
-            if hasattr(m, "present_in_prediction") and not m.present_in_prediction:
-                continue
-            by_mailshot[m.mailshot_id].append(m)
+    area_sum = 0.0
+    weight_total = 0
 
-        weighted_area_sum = 0.0
-        weight_total = 0
+    for ms in by_mailshot.values():
+        n = len(ms)
+        y_true = np.fromiter((m.opened for m in ms), dtype=np.int8, count=n)
+        pos = int(y_true.sum())
+        if pos == 0:
+            continue
 
-        for ms in by_mailshot.values():
-            n = len(ms)
-            if n == 0:
-                continue
+        y_pred = np.fromiter(
+            (m.prediction - m.stage for m in ms),
+            dtype=np.float64,
+            count=n,
+        )
 
-            y_true = np.fromiter((m.opened for m in ms), dtype=np.int8, count=n)
-            pos = int(y_true.sum())
-            if pos == 0:
-                continue
+        order = np.argsort(y_pred)[::-1]
+        cum_tp = np.cumsum(y_true[order], dtype=np.int64)
 
-            y_pred = np.fromiter(
-                ((m.prediction - m.stage) if hasattr(m, "stage") else m.prediction for m in ms),
-                dtype=np.float64,
-                count=n,
-            )
+        area_sum += cum_tp.sum() / pos
+        weight_total += n
 
-            order = np.argsort(y_pred)[::-1]
-            cum_tp = np.cumsum(y_true[order], dtype=np.int64)
-            rect_values = cum_tp / pos
-
-            i_start = int(np.ceil(k_min * n))
-            i_end = int(np.floor(k_max * n))
-
-            if i_start > i_end:
-                area = (k_max - k_min) * rect_values[i_start - 1]
-            else:
-                area = float(np.sum(rect_values[i_start:i_end])) / n if i_end > i_start else 0.0
-                if i_start > 0:
-                    left_overlap = i_start / n - k_min
-                    if left_overlap > 0:
-                        area += left_overlap * rect_values[i_start - 1]
-                if i_end < n:
-                    right_overlap = k_max - i_end / n
-                    if right_overlap > 0:
-                        area += right_overlap * rect_values[i_end]
-
-            weighted_area_sum += area * n
-            weight_total += n
-
-        if weight_total == 0:
-            return 0.0
-
-        return weighted_area_sum / (weight_total * (k_max - k_min))
+    return area_sum / weight_total if weight_total else 0.0

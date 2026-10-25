@@ -7,19 +7,11 @@ from pathlib import Path
 from email_outreach.experiment_utils.experiment_constants import (
     EXPERIMENT_RESULTS_FOLDER_NAME,
 )
-from email_outreach.ml.baselines.ddqn_linkedin import DoubleDQNTrainer
-from email_outreach.ml.baselines.factor_ucb import FactorUCBModel
-from email_outreach.ml.baselines.fmfcdb import FMFCDBModel
-from email_outreach.ml.baselines.fmpsal import FMPSALModel
-from email_outreach.ml.baselines.fmrsal import FMRSALModel
-from email_outreach.ml.baselines.model_based_rl import ModelBasedRL
-from email_outreach.ml.baselines.random_model import RandomModel
-from email_outreach.ml.baselines.thompson_sampling import ThompsonSamplingModel
+
 from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
     ContextualBanditWithAutoencoder,
 )
 
-# Ensure ROOT_FOLDER is in the system path
 logging.basicConfig(
     format="%(asctime)s : %(levelname)s : %(name)s : %(message)s",
     level=logging.INFO,
@@ -57,28 +49,7 @@ def main():
     n_jobs = args.n_jobs
     logger.info(f"Experiment version: {experiment_version} for model {model}")
 
-    if model == "contextual_bandit":
-        model_class = ContextualBanditWithAutoencoder
-    elif model == "ddqn":
-        model_class = DoubleDQNTrainer
-    elif model == "thompson_sampling":
-        model_class = ThompsonSamplingModel
-    elif model == "random":
-        model_class = RandomModel
-    elif model == "fmrsal":
-        model_class = FMRSALModel
-    elif model == "fmpsal":
-        model_class = FMPSALModel
-    elif model == "fmfcdb":
-        model_class = FMFCDBModel
-    elif model == "model_based_rl":
-        model_class = ModelBasedRL
-    elif model == "factor_ucb":
-        model_class = FactorUCBModel
-    else:
-        raise ValueError(f"Unknown model: {model}")
-
-    model_class.test(
+    ContextualBanditWithAutoencoder.test(
         sender_id=sender_id,
         split_sizes=split_sizes,
         repetitions=repetitions,
