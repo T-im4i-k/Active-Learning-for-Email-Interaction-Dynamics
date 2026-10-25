@@ -6,21 +6,31 @@ from typing import Dict, List, Set, Tuple, Type
 import numpy as np
 import torch
 
-from email_outreach.experiment_utils.experiment_constants import \
-    CONTEXTUAL_BANDIT_FOLDER_NAME
-from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import \
-    AbstractContextualModel
+from email_outreach.experiment_utils.experiment_constants import (
+    CONTEXTUAL_BANDIT_FOLDER_NAME,
+)
+from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
+    AbstractContextualModel,
+)
+from email_outreach.ml.shallow_autoencoder.autoencoder_chunked import ShallowAutoencoder
 from email_outreach.ml.shallow_autoencoder.coef_scheduler import (
-    AbstractCoefScheduler, AlphaSchedulerFactory, BetaSchedulerFactory,
-    CoefSchedulerArgs)
+    AbstractCoefScheduler,
+    AlphaSchedulerFactory,
+    BetaSchedulerFactory,
+    CoefSchedulerArgs,
+)
 from email_outreach.ml.shallow_autoencoder.config import (
-    ContextualBanditMetrics, ContextualBanditWithAutoencoderConfig)
+    ContextualBanditMetrics,
+    ContextualBanditWithAutoencoderConfig,
+)
 from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
-    AutoencoderDataset, NegativeAutoencoderDataset)
+    AutoencoderDataset,
+    NegativeAutoencoderDataset,
+)
 from email_outreach.ml.shallow_autoencoder.dataset.template_weight import (
-    AbstractTemplateWeight, TemplateWeightFactory)
-from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import \
-    ShallowAutoencoder
+    AbstractTemplateWeight,
+    TemplateWeightFactory,
+)
 from email_outreach.utils.constants import ROOT_FOLDER
 
 logger = logging.getLogger(__name__)

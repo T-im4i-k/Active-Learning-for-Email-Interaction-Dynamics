@@ -1,8 +1,9 @@
 import re
 from pathlib import Path
 
-from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import \
-    ContextualBanditMetrics
+from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
+    ContextualBanditMetrics,
+)
 
 
 class ResultsFileFinder:
