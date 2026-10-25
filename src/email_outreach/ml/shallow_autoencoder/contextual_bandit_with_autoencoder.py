@@ -1,10 +1,7 @@
-import json
 import logging
 from collections import defaultdict
 from copy import deepcopy
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List, Self, Set, Tuple, Type, Literal
+from typing import Dict, List, Set, Tuple, Type
 
 import numpy as np
 import torch
@@ -15,10 +12,11 @@ from email_outreach.experiment_utils.experiment_constants import (
 from email_outreach.utils.constants import ROOT_FOLDER
 
 from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
-    AbstractConfig,
     AbstractContextualModel,
-    ContextualBanditMetrics,
 )
+
+from email_outreach.ml.shallow_autoencoder.config import ContextualBanditMetrics,ContextualBanditWithAutoencoderConfig
+
 from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
     AutoencoderDataset,
     NegativeAutoencoderDataset
@@ -30,73 +28,9 @@ from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
 from email_outreach.ml.shallow_autoencoder.coef_scheduler import AbstractCoefScheduler, CoefSchedulerArgs, \
     AlphaSchedulerFactory, BetaSchedulerFactory
 from email_outreach.ml.shallow_autoencoder.dataset.template_weight import AbstractTemplateWeight, TemplateWeightFactory
-from typing import Any
 
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class ContextualBanditWithAutoencoderConfig(AbstractConfig):
-    d: int = 16
-    epochs: int = 30
-    lr: float = 0.01
-    wd: float = 0.0001
-    batch_size: int = 16
-    positive_weight: float = 100.0
-    alpha_params: dict[str, Any] = field(default_factory=lambda: {"type": "constant", "alpha": 0.1})
-    beta_params: dict[str, Any] = field(default_factory=lambda: {})
-    template_weight_params: dict[str, Any] = field(default_factory=lambda: {"type": "uniform"})
-    G: float = 10000.0
-    naive_f: bool = True
-    revised_s: bool = False
-    T: int = 2880  # Time in minutes
-    num_splits: int = 24  # Number of splits -> K
-    sent_by_T: float = 0.15  # Sent by T of all users
-    sent_after_T: float = 0.1
-    j: int = 0  # Repetition of the experiment
-    dropout: float = 0.0
-    p_type: Literal["mean", "var", "std"] = "mean"
-    noise_params: dict = field(default_factory=lambda: {})
-    double_sae: bool = False
-    negative_weight: float = 0.1
-    f_confidence: float = 1.0
-    negative_feedback_ratio: float = 0.1
-
-
-    def to_dict(self):
-        return {
-            "d": self.d,
-            "epochs": self.epochs,
-            "lr": self.lr,
-            "wd": self.wd,
-            "batch_size": self.batch_size,
-            "positive_weight": self.positive_weight,
-            "alpha_params": self.alpha_params,
-            "beta_params": self.beta_params,
-            "template_weight_params": self.template_weight_params,
-            "G": self.G,
-            "naive_f": self.naive_f,
-            "revised_s": self.revised_s,
-            "num_splits": self.num_splits,
-            "T": self.T,
-            "sent_by_T": self.sent_by_T,
-            "sent_after_T": self.sent_after_T,
-            "dropout": self.dropout,
-            "j": self.j,
-            "p_type": self.p_type,
-            "noise_params": self.noise_params,
-            "double_sae": self.double_sae,
-            "negative_weight": self.negative_weight,
-            "f_confidence": self.f_confidence,
-            "negative_feedback_ratio": self.negative_feedback_ratio
-        }
-
-    @classmethod
-    def from_json_file(cls, folder: Path, filename: str = "config.json") -> Self:
-        with open(folder / filename, "r") as f:
-            data = json.load(f)
-
-        return cls(**data)
 
 
 class ContextualBanditWithAutoencoder(AbstractContextualModel):
