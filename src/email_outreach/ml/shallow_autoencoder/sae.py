@@ -58,7 +58,7 @@ class ShallowAutoencoder(nn.Module):
         weight_decay,
         positive_weight,
     ):
-        set_seed()
+        set_seed(42)
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
         optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
@@ -83,7 +83,6 @@ class ShallowAutoencoder(nn.Module):
         self.eval()
         with torch.no_grad():
             return self.forward(X)
-        return reconstruction
 
     def predict_logit(self, X):
         self.eval()

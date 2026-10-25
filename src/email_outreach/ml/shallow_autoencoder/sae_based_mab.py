@@ -6,10 +6,12 @@ from typing import Type
 import numpy as np
 import torch
 
+from functools import cached_property
+
 from email_outreach.experiment_utils.experiment_constants import (
     CONTEXTUAL_BANDIT_FOLDER_NAME,
 )
-from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
+from email_outreach.ml.shallow_autoencoder.abstract_mab import (
     AbstractContextualModel,
 )
 from email_outreach.ml.shallow_autoencoder.sae import ShallowAutoencoder
@@ -25,6 +27,7 @@ from email_outreach.ml.shallow_autoencoder.config import (
 )
 from email_outreach.ml.shallow_autoencoder.dataset import (
     AutoencoderDataset,
+    PositiveAutoencoderDataset,
     NegativeAutoencoderDataset,
 )
 from email_outreach.ml.shallow_autoencoder.template_weight import (
@@ -57,8 +60,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.user_mask: list[np.ndarray] = []
 
         self._naive_f_partial: torch.Tensor | None = None
-        self._p_cache: torch.Tensor | None = None
-        self._phi_cache: torch.Tensor | None = None
 
 
 
@@ -111,7 +112,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
             self._negative_autoencoder.fit(
                 NegativeAutoencoderDataset(train),
-                val=val,
+                val=NegativeAutoencoderDataset(val),
                 epochs=self.config.epochs,
                 lr=self.config.lr,
                 batch_size=self.config.batch_size,
@@ -122,8 +123,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             # np.save(ROOT_FOLDER / "additional_data" / "D" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
 
         self.autoencoder.fit(
-            train,
-            val=val,
+            PositiveAutoencoderDataset(train),
+            val=PositiveAutoencoderDataset(val),
             epochs=self.config.epochs,
             lr=self.config.lr,
             batch_size=self.config.batch_size,
@@ -239,8 +240,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
 
 # ===== p ===== 
-
-    def calculate_p(self) -> torch.Tensor:
+    @cached_property
+    def p_score(self) -> torch.Tensor:
         batch_size = 256
         input_dim = self.train.num_users
 
@@ -275,11 +276,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             case _:
                 raise ValueError("Unknown p value")
 
-    def get_p(self) -> torch.Tensor:
-        if self._p_cache is None:
-            self._p_cache = self.calculate_p()
-
-        return self._p_cache
 
 # ===== f =====
 
@@ -372,17 +368,11 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 return self.calculate_s_revised(phi, p, f, scheduler_args)
 
 # ===== phi =====
-
-    def get_phi(self) -> torch.Tensor:
-        if not self._template_weight:
-            raise ValueError("No template weight")
-
-        if self._phi_cache is None:
-            self._phi_cache = self.train.popularity_tensor(
+    @cached_property
+    def phi_score(self) -> torch.Tensor:
+        return self.train.popularity_tensor(
                 self._template_weight
             )
-
-        return self._phi_cache
 
 # ===== TS MAB =====
 
@@ -396,8 +386,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
     ) -> torch.Tensor:
 
         f: torch.Tensor = self.get_f(opened, newly_opened, sent_indices)
-        p: torch.Tensor = self.get_p()
-        phi: torch.Tensor = self.get_phi()
+        p: torch.Tensor = self.p_score
+        phi: torch.Tensor = self.phi_score
 
         s: torch.Tensor = self.get_s(phi, p, f, scheduler_args)
 

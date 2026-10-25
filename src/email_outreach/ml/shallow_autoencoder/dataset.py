@@ -1,339 +1,244 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict, List, Optional, Self, Tuple
+from itertools import accumulate, pairwise
+from typing import Self, Sequence
+from functools import cached_property
 
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from email_outreach.ml.shallow_autoencoder.template_weight import (
+    AbstractTemplateWeight,
+)
 from email_outreach.utils.data_loader_utils import load_data_for_sender
 
 logger = logging.getLogger(__name__)
 
-from email_outreach.ml.shallow_autoencoder.template_weight import (
-    AbstractTemplateWeight,
-)
+REQUIRED_COLUMNS = ("mailshot_id", "user_id", "opened", "time_to_open")
+MIN_MAILS_PER_MAILSHOT = 100
+
+# --------------------------------------------------------------------------- #
+# Pure helpers
+# --------------------------------------------------------------------------- #
+def _drop_users_below_min_opens(mails: pd.DataFrame, min_opens: int) -> pd.DataFrame:
+    opens_per_user = mails.groupby("user_id")["opened"].sum()
+    kept_users = opens_per_user.index[opens_per_user >= min_opens]
+    return mails[mails["user_id"].isin(kept_users)]
 
 
+def _wide_matrices(
+    mails: pd.DataFrame, mailshot_ids: list[int], n_users: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Pivot the long table into (opens, non_opens), each (mailshots x users) float32.
+
+    ``mails["user_id"]`` must already be mapped to column indices. Duplicate
+    (mailshot, user) rows are combined with ``max``, i.e. "any".
+    """
+    indicators = mails[["mailshot_id", "user_id"]].assign(
+        opens=(mails["opened"] == 1).astype(np.float32),
+        non_opens=(mails["opened"] == 0).astype(np.float32),
+    )
+    wide = indicators.pivot_table(
+        index="mailshot_id",
+        columns="user_id",
+        values=["opens", "non_opens"],
+        aggfunc="max",
+        fill_value=0,
+    )
+
+    def to_matrix(name: str) -> np.ndarray:
+        return (
+            wide[name]
+            .reindex(index=mailshot_ids, columns=range(n_users), fill_value=0)
+            .to_numpy(dtype=np.float32)
+        )
+
+    return to_matrix("opens"), to_matrix("non_opens")
+
+
+def _simulate_time_to_open(mails: pd.DataFrame) -> dict[int, pd.Series]:
+    pairs = mails.drop_duplicates(["mailshot_id", "user_id"], keep="last")
+    mean_minutes = (
+        pd.to_timedelta(pairs["time_to_open"]).dt.total_seconds().abs().to_numpy() / 60
+    )
+
+    observed = ~np.isnan(mean_minutes)
+    simulated = np.full(len(pairs), np.inf)
+    simulated[observed] = np.random.exponential(mean_minutes[observed])
+
+    by_pair = pairs[["mailshot_id", "user_id"]].assign(tto=simulated)
+    return {
+        int(mailshot_id): group.set_index("user_id")["tto"]
+        for mailshot_id, group in by_pair.groupby("mailshot_id")
+    }
+
+def _clean_mails(mails: pd.DataFrame) -> pd.DataFrame:
+    mails = mails[list(REQUIRED_COLUMNS)]
+    mails = mails[
+        mails.groupby("mailshot_id")["user_id"].transform("size")
+        >= MIN_MAILS_PER_MAILSHOT
+    ]
+    mails = mails.drop_duplicates(subset=["mailshot_id", "user_id"])
+    dense_ids, _ = pd.factorize(mails["mailshot_id"], sort=True)
+    return mails.assign(mailshot_id=dense_ids).reset_index(drop=True)
+
+
+# --------------------------------------------------------------------------- #
+# Datasets
+# --------------------------------------------------------------------------- #
 class AutoencoderDataset(Dataset):
-    validation_size = 1
-    test_size = 1
-
     def __init__(
         self,
         mails: pd.DataFrame,
-        user_id_mapper: Dict[int, int] = None,
+        user_id_mapper: dict[int, int] | None = None,
         remove_users_below_n_opens: int = 0,
-        sender_id: int = None,
-    ):
-        assert all(
-            column in mails.columns
-            for column in ["mailshot_id", "user_id", "opened", "time_to_open"]
-        )
-        self.mails = mails
-        self.sender_id = sender_id
-        self._mailshot_embeddings: np.ndarray = np.array([])
-        self.negative_mailshot_embeddings: np.ndarray = np.array([])
-        self._tto_matrix: np.ndarray = np.array([])
-        self._time_to_open: Dict[int, Dict[int, float]] = (
-            {}
-        )  # mailshot_id -> user_id -> time_to_open
-        if user_id_mapper:
-            self._user_id_mapper = user_id_mapper
+        sender_id: int | None = None,
+    ) -> None:
+        missing = set(REQUIRED_COLUMNS) - set(mails.columns)
+        if missing:
+            raise ValueError(f"`mails` is missing columns: {sorted(missing)}")
+
+        mails = _drop_users_below_min_opens(mails, remove_users_below_n_opens)
+        if user_id_mapper is None:
+            user_ids = sorted(mails["user_id"].unique().tolist())
+            user_id_mapper = {user_id: i for i, user_id in enumerate(user_ids)}
         else:
-            self._user_id_mapper: Dict[int, int] = {}
-        self._validation_mask = None
-        self._training_mask = None
-        self._remove_users_with_no_opens(remove_users_below_n_opens)
-        self._reverse_user_id_mapper: Dict[int, int] = {}
-        self._mails_to_data()
-        self._mails_to_negative_data()
-        self._mails_to_tto_data()
-        self._user_clusters: Optional[pd.DataFrame] = None
-        self._training_mask_recalc = 0
+            mails = mails[mails["user_id"].isin(list(user_id_mapper))]
 
-        self.min_template_id: int = self.mails["mailshot_id"].min()
-        self.max_template_id: int = self.mails["mailshot_id"].max()
-
-    @property
-    def num_users(self) -> int:
-        return len(self._user_id_mapper)
-
-    @property
-    def average_opens(self) -> float:
-        return self.mails["opened"].sum() / len(self)
-
-    @property
-    def reversed_user_id_mapper(self) -> Dict[int, int]:
-        if not self._reverse_user_id_mapper:
-            self._reverse_user_id_mapper = {
-                v: k for k, v in self._user_id_mapper.items()
-            }
-        return self._reverse_user_id_mapper
-
-    @property
-    def shape(self) -> Tuple[int, ...]:
-        return self._mailshot_embeddings.shape
-
-    @property
-    def tto_matrix(self) -> torch.Tensor:
-        return torch.tensor(self._tto_matrix, dtype=torch.float64)
-
-    @property
-    def validation_mask(self) -> torch.tensor:
-        if self._validation_mask is None:
-            torch.manual_seed(42)
-            mask = torch.zeros(self.shape)
-            mask = mask + torch.bernoulli(torch.ones(self.shape) * 0.98)
-            mask = mask.bool()
-            self._validation_mask = mask
-        return self._validation_mask
-
-    @property
-    def training_mask(self) -> torch.tensor:
-        if self._training_mask is None:
-            torch.manual_seed(42)
-            mask = torch.zeros(self.shape)
-            mask = mask + torch.bernoulli(torch.ones(self.shape) * 0.85)
-            mask = mask.bool()
-            # Combine with the validation mask
-            mask = mask & self.validation_mask
-            self._training_mask = mask
-        return self._training_mask
-
-    @property
-    def mailshot_ids(self) -> List[int]:
-        return sorted(self.mails["mailshot_id"].unique())
-
-    def popularity_tensor(
-        self, template_weight: AbstractTemplateWeight
-    ) -> torch.Tensor:
-        mails = self.mails.assign(
-            raw_weight=lambda df: df["mailshot_id"].map(template_weight),
+        self.sender_id = sender_id
+        self.user_id_mapper: dict[int, int] = user_id_mapper
+        self.mails: pd.DataFrame = mails.assign(
+            user_id=mails["user_id"].map(user_id_mapper)
         )
-        mails = mails.assign(weighted_opened=mails["raw_weight"] * mails["opened"])
+        self.mailshot_ids: list[int] = sorted(self.mails["mailshot_id"].unique().tolist())
+        self._row_of_mailshot = {m: row for row, m in enumerate(self.mailshot_ids)}
 
-        grouped = mails.groupby("user_id")
-        weighted_sum = grouped["weighted_opened"].sum()
-        weight_total = grouped["raw_weight"].sum()
+        self.opens, self.non_opens = _wide_matrices(
+            self.mails, self.mailshot_ids, self.num_users
+        )
+        self._time_to_open = _simulate_time_to_open(self.mails)
 
-        popularity = (weighted_sum / weight_total).sort_index()
-        return torch.tensor(popularity.to_numpy(), dtype=torch.float64)
-
-    def popularity_legacy(self):
-        opens = self.mails.groupby("user_id")["opened"].sum().sort_index()
-        count = self.mails.groupby("user_id")["opened"].count().sort_index()
-        return torch.tensor(opens / count)
-
-    @property
-    def user_clusters(self) -> pd.DataFrame:
-        """
-        DEPRECATED
-        Return the precalculated user clusters.
-        @return: pd.DataFrame with user clusters
-        """
-        if self._user_clusters is None:
-            try:
-                raise FileNotFoundError
-            except FileNotFoundError:
-                self._user_clusters = self.mails[["user_id"]].copy()
-                self._user_clusters["cluster"] = 0
-        return self._user_clusters
-
-    def mailshot_user_indices(self, mailshot_id: int) -> List[int]:
-        return self.mails[self.mails["mailshot_id"] == mailshot_id]["user_id"].unique()
-
+    # ------------------------------------------------------------------ #
+    # Constructors
+    # ------------------------------------------------------------------ #
     @classmethod
     def from_disk(cls, sender_id: int) -> Self:
-        mails: pd.DataFrame = load_data_for_sender(sender_id)
-        return cls(mails)
+        return cls(load_data_for_sender(sender_id), sender_id=sender_id)
 
     @classmethod
     def from_disk_data_split(
-        cls, sender_id: int, split_sizes: List[int], remove_users_below_n_opens: int = 0
-    ) -> List[Self]:
-        logger.info(f"Loading data for sender {sender_id}")
-        mails: pd.DataFrame = load_data_for_sender(sender_id)
-        # Drop mailshots with less mails than 100
-        mails = mails.groupby("mailshot_id").filter(lambda x: len(x) >= 100)
-        mails = mails.reset_index(drop=True)
-        mails = mails[["mailshot_id", "user_id", "opened", "time_to_open"]]
-        mails = mails.drop_duplicates(subset=["mailshot_id", "user_id"])
-        mails = mails.reset_index(drop=True)
-        assert all(
-            column in mails.columns
-            for column in ["mailshot_id", "user_id", "opened", "time_to_open"]
-        )
-        mailshot_ids = mails["mailshot_id"].unique()
-        mailshot_ids = sorted(mailshot_ids)
-        # remap mailshot ids to autoincrementing integers
-        mailshot_id_map = {mailshot_id: i for i, mailshot_id in enumerate(mailshot_ids)}
-        mails["mailshot_id"] = mails["mailshot_id"].map(mailshot_id_map)
-        mailshot_ids = sorted(mails["mailshot_id"].unique())
-        first_size = len(mailshot_ids) - np.sum(split_sizes)
-        split_sizes = [first_size] + split_sizes
+        cls,
+        sender_id: int,
+        split_sizes: Sequence[int],
+        remove_users_below_n_opens: int = 0,
+    ) -> list[Self]:
 
-        # Calculate the indices for the splits
-        split_indices = np.cumsum(split_sizes)
-        split_indices = [0] + split_indices.tolist()
+        logger.info("Loading data for sender %s", sender_id)
+        mails = _clean_mails(load_data_for_sender(sender_id))
 
-        datasets = []
-        for i in range(len(split_sizes)):
-            split_mailshot_ids = mailshot_ids[split_indices[i] : split_indices[i + 1]]
-            split_mails = mails[mails["mailshot_id"].isin(split_mailshot_ids)].copy()
-            if i == 0:
-                train = cls(
-                    split_mails,
-                    remove_users_below_n_opens=remove_users_below_n_opens,
-                    sender_id=sender_id,
-                )
-                datasets.append(train)
-            else:
-                datasets.append(
-                    cls(split_mails, train._user_id_mapper, sender_id=sender_id)
-                )
-
-        return datasets
-
-    def __getitem__(self, index) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Returns the training, validation and test tensor for the given index.
-        :param index:
-        :return: masked data by the training mask, masked data by the training mask, full data
-        """
-        x = torch.tensor(self._mailshot_embeddings[index])
-        return x, x
-
-    def __len__(self):
-        return len(self._mailshot_embeddings)
-
-    def _mails_to_data(self):
-        # Mapper for user_id
-        user_ids = self.mails["user_id"].unique()
-        if self._user_id_mapper:
-            # If a user mapper is provided -> remove users that are not in the mapper
-            # the users that are not present in the current dataset will be treated with 0s
-            logger.info("Using existing user id mapper")
-            extra_user_ids = set(user_ids) - set(self._user_id_mapper.keys())
-            reduced_user_ids = [
-                user_id for user_id in user_ids if user_id not in extra_user_ids
-            ]
-            logger.info(
-                f"Reduced user ids: {len(reduced_user_ids)}, old user ids: {len(user_ids)}"
+        n_train = mails["mailshot_id"].nunique() - sum(split_sizes)
+        if n_train < 1:
+            raise ValueError(
+                f"split_sizes {list(split_sizes)} leave {n_train} training mailshots"
             )
-            user_ids = reduced_user_ids
-        else:
-            # If a user mapper is not provided -> create a new one
-            user_ids = sorted(user_ids)
-            user_id_map = {user_id: i for i, user_id in enumerate(user_ids)}
-            self._user_id_mapper = user_id_map
 
-        self.mails = self.mails[self.mails["user_id"].isin(user_ids)]
-        self.mails["user_id"] = self.mails["user_id"].map(self._user_id_mapper)
+        edges = [0, *accumulate(split_sizes, initial=n_train)]
+        chunks = [
+            mails[(mails["mailshot_id"] >= lo) & (mails["mailshot_id"] < hi)]
+            for lo, hi in pairwise(edges)
+        ]
 
-        # For each mailshot we have to create a sequence of mails and their opened binary vector
-        # The shape resembles the shape of the user_id_mapper (either the one provided or the one created)
-        mailshot_embeddings = []
-        for mailshot_id in self.mails["mailshot_id"].unique():
-            feature_vector = np.zeros(len(self._user_id_mapper))
-            # Fill in the opened mails
-            opened = self.mails[
-                (self.mails["mailshot_id"] == mailshot_id)
-                & (self.mails["opened"] == 1)
-                & (self.mails["user_id"].isin(self._user_id_mapper.values()))
-            ]
-            feature_vector[opened["user_id"]] = 1
-            mailshot_embeddings.append(feature_vector)
-        self._mailshot_embeddings = np.array(mailshot_embeddings).astype(np.float32)
-
-    def _mails_to_negative_data(self):
-        negative_mailshot_embeddings = []
-        for mailshot_id in self.mails["mailshot_id"].unique():
-            feature_vector = np.zeros(len(self._user_id_mapper))
-            # Fill in the sent-but-unopened mails
-            unopened = self.mails[
-                (self.mails["mailshot_id"] == mailshot_id)
-                & (self.mails["opened"] == 0)
-                & (self.mails["user_id"].isin(self._user_id_mapper.values()))
-            ]
-            feature_vector[unopened["user_id"]] = 1
-            negative_mailshot_embeddings.append(feature_vector)
-        self.negative_mailshot_embeddings = np.array(
-            negative_mailshot_embeddings
-        ).astype(np.float32)
-
-    def _mails_to_tto_data(self):
-        tto_matrix = []
-        for mailshot_id in self.mails.mailshot_id.unique():
-            mailshot_mails = self.mails[self.mails["mailshot_id"] == mailshot_id].copy()
-            # Mean does not do anything here, there is only one value per user
-            time_to_open = mailshot_mails.set_index("user_id")["time_to_open"].to_dict()
-            # Time to float representing number of hours
-            # Sample from exponential distribution to simulate time to open
-            mailshot_tto = {
-                user_id: (
-                    np.random.exponential(
-                        abs(pd.to_timedelta(time_to_open).total_seconds() / 60)
-                    )
-                    if pd.notna(time_to_open)
-                    else np.inf
-                )
-                for user_id, time_to_open in time_to_open.items()
-            }
-            self._time_to_open[mailshot_id] = mailshot_tto
-
-            tto_row = np.full(len(self._user_id_mapper), np.inf, dtype=np.float64)
-            for user_id, tto in mailshot_tto.items():
-                tto_row[user_id] = tto
-            tto_matrix.append(tto_row)
-        self._tto_matrix = np.array(tto_matrix, dtype=np.float64)
-
-    def number_of_opens_for_user(self, user_id: int) -> int:
-        return self.mails[self.mails["user_id"] == user_id]["opened"].sum()
-
-    def _remove_users_with_no_opens(self, threshold: int = 0):
-        logger.info(
-            f"Removing users with less than {threshold} opens, current number of users: {len(self.mails['user_id'].unique())}"
+        train = cls(
+            chunks[0],
+            remove_users_below_n_opens=remove_users_below_n_opens,
+            sender_id=sender_id,
         )
-        users_with_opens = self.mails.groupby("user_id")["opened"].sum()
-        users_with_opens = users_with_opens[users_with_opens >= threshold].index
-        self.mails = self.mails[self.mails["user_id"].isin(users_with_opens)]
-        logger.info(
-            f"Removed users with no opens, new number of users: {len(self.mails['user_id'].unique())}"
-        )
+        others = [
+            cls(chunk, user_id_mapper=train.user_id_mapper, sender_id=sender_id)
+            for chunk in chunks[1:]
+        ]
+        return [train, *others]
+
+    # ------------------------------------------------------------------ #
+    # Basic properties
+    # ------------------------------------------------------------------ #
+    @property
+    def num_users(self) -> int:
+        return len(self.user_id_mapper)
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.opens.shape
+
+    @property
+    def min_template_id(self) -> int:
+        return self.mailshot_ids[0]
+
+    @property
+    def max_template_id(self) -> int:
+        return self.mailshot_ids[-1]
+
+    # ------------------------------------------------------------------ #
+    # Per-mailshot / per-user accessors
+    # ------------------------------------------------------------------ #
 
     def select_opened_indices(
-        self, mailshot_id: int, indices: List[int], time_to_open: float
-    ) -> List[int]:
-        """
-        Selects indices of users that opened the mail within the given time frame.
-        """
-        tto_users: Dict[int, float] = self._time_to_open[mailshot_id]
-        selected = [
-            i for i in indices if i in tto_users and tto_users[i] <= time_to_open
-        ]
-        return selected
+        self, mailshot_id: int, indices: Sequence[int], time_to_open: float
+    ) -> list[int]:
 
-    def tensor_of_opens_of_mailshot(self, mailshot_id: int) -> torch.Tensor:
-        """
-        Returns a tensor of opens for the given mailshot_id.
-        """
-        return torch.tensor(self._mailshot_embeddings[mailshot_id])
+        simulated = self._time_to_open[mailshot_id].reindex(indices)
+        return [i for i, tto in zip(indices, simulated) if tto <= time_to_open]
 
-    def tensor_of_unopens_of_mailshot(self, mailshot_id: int) -> torch.Tensor:
-        """
-        Returns a tensor of sent-but-unopened recipients for the given mailshot_id.
-        """
-        return torch.tensor(self.negative_mailshot_embeddings[mailshot_id])
+    def mailshot_user_indices(self, mailshot_id: int) -> np.ndarray:
+        in_mailshot = self.mails["mailshot_id"] == mailshot_id
+        return self.mails.loc[in_mailshot, "user_id"].unique()
+
+    @cached_property
+    def sends(self) -> np.ndarray:
+        return np.maximum(self.opens, self.non_opens)
+
+    def popularity_tensor(self, template_weight: AbstractTemplateWeight) -> torch.Tensor:
+        weights = pd.Series(self.mailshot_ids).map(template_weight).to_numpy(np.float64)
+        weighted_opens = weights @ self.opens
+        weighted_sends = weights @ self.sends
+        rate = np.divide(
+            weighted_opens,
+            weighted_sends,
+            out=np.full(self.num_users, np.nan),
+            where=weighted_sends != 0,
+        )
+        return torch.tensor(rate, dtype=torch.float64)
 
 
-class NegativeAutoencoderDataset(Dataset):
-    def __init__(self, autoencoder_dataset: AutoencoderDataset):
+    def __len__(self) -> int:
+        return len(self.opens)
+
+    def __getitem__(self, index):
+        x = torch.tensor(self.opens[index])
+        return x
+
+
+class PositiveAutoencoderDataset(Dataset):
+    def __init__(self, autoencoder_dataset: AutoencoderDataset) -> None:
         self.dataset = autoencoder_dataset
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset)
 
-    def __getitem__(self, index) -> tuple[torch.Tensor, torch.Tensor]:
-        x = torch.tensor(self.dataset.negative_mailshot_embeddings[index])
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        x = torch.tensor(self.dataset[index])
+        return x, x
+
+class NegativeAutoencoderDataset(Dataset):
+    def __init__(self, autoencoder_dataset: AutoencoderDataset) -> None:
+        self.dataset = autoencoder_dataset
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        x = torch.tensor(self.dataset[index])
         return x, x
