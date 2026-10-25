@@ -54,7 +54,7 @@ def main():
         split_sizes=split_sizes,
         repetitions=repetitions,
         version=experiment_version,
-        n_jobs = n_jobs
+        n_jobs=n_jobs,
     )
 
 

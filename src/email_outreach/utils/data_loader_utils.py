@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 DATA_FOLDER = ROOT_FOLDER / Path("data") / "subsets"
 
+
 def load_data_for_sender(sender_id: int) -> pd.DataFrame:
     """Load data for a sender from a parquet file."""
     try:

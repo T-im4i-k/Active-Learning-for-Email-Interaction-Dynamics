@@ -24,7 +24,10 @@ from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
     AutoencoderDataset,
 )
 
-from email_outreach.ml.shallow_autoencoder.config import ContextualBanditMetrics, ContextualBanditWithAutoencoderConfig
+from email_outreach.ml.shallow_autoencoder.config import (
+    ContextualBanditMetrics,
+    ContextualBanditWithAutoencoderConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,12 @@ class AbstractContextualModel(ABC):
 
     @classmethod
     def test(
-            cls, sender_id: int, split_sizes: list[int], repetitions: int, version: str, n_jobs
+        cls,
+        sender_id: int,
+        split_sizes: list[int],
+        repetitions: int,
+        version: str,
+        n_jobs,
     ) -> None:
         if len(split_sizes) != 1:
             raise ValueError("Only one split size is allowed for this experiment.")
@@ -82,7 +90,9 @@ class AbstractContextualModel(ABC):
         experiments_folder = get_test_folder_path(
             sender_id=sender_id, model_name=cls.model_name(), version=version
         )
-        config: ContextualBanditWithAutoencoderConfig = cls.config_class().from_json_file(experiments_folder)
+        config: ContextualBanditWithAutoencoderConfig = (
+            cls.config_class().from_json_file(experiments_folder)
+        )
 
         Parallel(n_jobs=n_jobs, verbose=10)(
             delayed(cls._run_single_test)(
@@ -93,14 +103,24 @@ class AbstractContextualModel(ABC):
                 config=config,
                 repetition=repetition,
                 i=i,
-                current_split_size=current_split_size
+                current_split_size=current_split_size,
             )
-            for repetition in range(repetitions) for i, current_split_size in enumerate(range(split_size, 0, -1))
+            for repetition in range(repetitions)
+            for i, current_split_size in enumerate(range(split_size, 0, -1))
         )
 
     @classmethod
-    def _run_single_test(cls, sender_id, repetitions, split_size, experiments_folder, config, repetition, i,
-                         current_split_size):
+    def _run_single_test(
+        cls,
+        sender_id,
+        repetitions,
+        split_size,
+        experiments_folder,
+        config,
+        repetition,
+        i,
+        current_split_size,
+    ):
         logger.info(
             f"Experiment {i + 1}/{split_size} - Repetition {repetition + 1}/{repetitions}"
         )
@@ -118,7 +138,7 @@ class AbstractContextualModel(ABC):
 
         # Create a folder for the current split size and repetition
         current_folder = experiments_folder / (
-                EXPERIMENT_RESULTS_FOLDER_NAME + f"_{i + 1}_{repetition}"
+            EXPERIMENT_RESULTS_FOLDER_NAME + f"_{i + 1}_{repetition}"
         )
         current_folder.mkdir(parents=True, exist_ok=True)
         logger.info(f"Current folder: {current_folder}. Saving results...")
@@ -128,16 +148,16 @@ class AbstractContextualModel(ABC):
 
     @classmethod
     def grid_search(
-            cls,
-            sender_id: int,
-            split_sizes: list[int],
-            version: str,
-            param_grid: dict[str, list[Any]],
-            n_samples: int | None = None,
-            n_jobs: int = 8,
-            random_state: int = 42,
+        cls,
+        sender_id: int,
+        split_sizes: list[int],
+        version: str,
+        param_grid: dict[str, list[Any]],
+        n_samples: int | None = None,
+        n_jobs: int = 8,
+        random_state: int = 42,
     ) -> None:
-        
+
         logger.info(
             f"Starting grid search for {cls.model_name()} with {len(param_grid)} parameters"
         )
@@ -209,16 +229,18 @@ class AbstractContextualModel(ABC):
         logger.info(f"Grid search completed in {elapsed_time:.1f} seconds")
 
         # Process and save results
-        cls._save_grid_search_results(results, results_folder, test_folder, elapsed_time)
+        cls._save_grid_search_results(
+            results, results_folder, test_folder, elapsed_time
+        )
 
     @classmethod
     def _run_single_experiment(
-            cls,
-            cfg_dict: dict[str, Any],
-            exp_number: int,
-            train: AutoencoderDataset,
-            val: AutoencoderDataset,
-            results_folder: Path,
+        cls,
+        cfg_dict: dict[str, Any],
+        exp_number: int,
+        train: AutoencoderDataset,
+        val: AutoencoderDataset,
+        results_folder: Path,
     ) -> dict[str, Any]:
 
         exp_folder = results_folder / f"exp_{exp_number}"
@@ -234,9 +256,7 @@ class AbstractContextualModel(ABC):
         metrics = model.predict(val)
 
         score = AbstractContextualModel.calculate_auc(metrics)
-        _, recalls, precisions = cls.calculate_recall_precision_at_quantiles(
-            metrics
-        )
+        _, recalls, precisions = cls.calculate_recall_precision_at_quantiles(metrics)
 
         results_summary = {
             "experiment_number": exp_number,
@@ -254,9 +274,13 @@ class AbstractContextualModel(ABC):
 
     @classmethod
     def _save_grid_search_results(
-            cls, results: list[dict[str, Any]], results_folder: Path, test_folder: Path, elapsed_time: float
+        cls,
+        results: list[dict[str, Any]],
+        results_folder: Path,
+        test_folder: Path,
+        elapsed_time: float,
     ) -> None:
-        
+
         results_data = []
         for result in results:
             row = {
@@ -294,11 +318,10 @@ class AbstractContextualModel(ABC):
         with open(test_folder / "config.json", "w") as f:
             json.dump(top_results[0]["config"], f, indent=4)
 
-
     @staticmethod
     def calculate_recall_precision_at_quantiles(
-            metrics: list[ContextualBanditMetrics],
-            quantiles: Sequence[float] = (0.25, 0.5, 0.75, 0.85),
+        metrics: list[ContextualBanditMetrics],
+        quantiles: Sequence[float] = (0.25, 0.5, 0.75, 0.85),
     ) -> tuple[list[float], list[float], list[float]]:
 
         by_mailshot = defaultdict(list)

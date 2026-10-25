@@ -33,6 +33,7 @@ class TrainingMetrics:
     def __str__(self):
         return f"loss: {self.loss:.4f}, val (masked) NDCG: {self.average_ndcg:.4f}, val (masked) f1: {self.average_f1:.4f}, val loss: {self.val_loss:.4f}, val NDCG: {self.val_average_ndcg:.4f}, val f1: {self.val_average_f1:.4f}"
 
+
 class ShallowAutoencoder(nn.Module):
     """
     Shallow linear autoencoder based on the formulation:
@@ -49,7 +50,10 @@ class ShallowAutoencoder(nn.Module):
     """
 
     def __init__(
-            self, n: int, d: int,  dropout_p=0.1,
+        self,
+        n: int,
+        d: int,
+        dropout_p=0.1,
     ):
         super().__init__()
         self.E = nn.Parameter(torch.empty(n, d))
@@ -76,17 +80,16 @@ class ShallowAutoencoder(nn.Module):
     def forward(self, X):
         out = self.logit(X)
         return torch.sigmoid(out)
-    
 
     def fit(
-            self,
-            train: Dataset,
-            val: Dataset,
-            epochs,
-            lr,
-            batch_size,
-            weight_decay,
-            positive_weight,
+        self,
+        train: Dataset,
+        val: Dataset,
+        epochs,
+        lr,
+        batch_size,
+        weight_decay,
+        positive_weight,
     ):
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
         optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class AbstractTemplateWeight(ABC):
     def __init__(self, min_template_id: int, max_template_id: int) -> None:
         self.min_template_id: int = min_template_id
@@ -17,13 +18,18 @@ class AbstractTemplateWeight(ABC):
 
 
 class ExponentialTemplateWeight(AbstractTemplateWeight):
-    def __init__(self, min_template_id: int, max_template_id: int, half_life: float) -> None:
+    def __init__(
+        self, min_template_id: int, max_template_id: int, half_life: float
+    ) -> None:
         super().__init__(min_template_id, max_template_id)
         self.half_life: float = half_life
 
     def _raw_weight(self, template_id: int) -> float:
-        delta_id: float = (self.max_template_id - template_id)/(self.max_template_id - self.min_template_id)
+        delta_id: float = (self.max_template_id - template_id) / (
+            self.max_template_id - self.min_template_id
+        )
         return 2 ** (-delta_id / self.half_life)
+
 
 class UniformTemplateWeight(AbstractTemplateWeight):
     def _raw_weight(self, template_id: int) -> float:
@@ -38,10 +44,13 @@ class TemplateWeightFactory:
 
         match template_weight_type:
             case "uniform":
-                return UniformTemplateWeight(min_template_id=config["min_template_id"],max_template_id=config["max_template_id"])
+                return UniformTemplateWeight(
+                    min_template_id=config["min_template_id"],
+                    max_template_id=config["max_template_id"],
+                )
             case "exponential":
                 return ExponentialTemplateWeight(
                     min_template_id=config["min_template_id"],
                     max_template_id=config["max_template_id"],
-                    half_life=template_weight_params["half_life"]
+                    half_life=template_weight_params["half_life"],
                 )

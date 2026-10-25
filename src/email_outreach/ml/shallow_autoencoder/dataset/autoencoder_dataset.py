@@ -10,7 +10,10 @@ from email_outreach.utils.data_loader_utils import load_data_for_sender
 
 logger = logging.getLogger(__name__)
 
-from email_outreach.ml.shallow_autoencoder.dataset.template_weight import AbstractTemplateWeight
+from email_outreach.ml.shallow_autoencoder.dataset.template_weight import (
+    AbstractTemplateWeight,
+)
+
 
 class AutoencoderDataset(Dataset):
     validation_size = 1
@@ -102,7 +105,9 @@ class AutoencoderDataset(Dataset):
     def mailshot_ids(self) -> List[int]:
         return sorted(self.mails["mailshot_id"].unique())
 
-    def popularity_tensor(self, template_weight: AbstractTemplateWeight) -> torch.Tensor:
+    def popularity_tensor(
+        self, template_weight: AbstractTemplateWeight
+    ) -> torch.Tensor:
         mails = self.mails.assign(
             raw_weight=lambda df: df["mailshot_id"].map(template_weight),
         )
@@ -253,7 +258,9 @@ class AutoencoderDataset(Dataset):
             ]
             feature_vector[unopened["user_id"]] = 1
             negative_mailshot_embeddings.append(feature_vector)
-        self.negative_mailshot_embeddings = np.array(negative_mailshot_embeddings).astype(np.float32)
+        self.negative_mailshot_embeddings = np.array(
+            negative_mailshot_embeddings
+        ).astype(np.float32)
 
     def _mails_to_tto_data(self):
         tto_matrix = []

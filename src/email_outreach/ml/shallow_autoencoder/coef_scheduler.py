@@ -39,7 +39,7 @@ class AdaptiveCoefScheduler(AbstractCoefScheduler):
 
 class InterpolatingCoefScheduler(AbstractCoefScheduler, ABC):
     def __init__(
-            self, left_bound: float, right_bound: float, batch_sizes: Sequence[float]
+        self, left_bound: float, right_bound: float, batch_sizes: Sequence[float]
     ) -> None:
         if not 0.0 <= left_bound <= 1.0:
             raise ValueError("Argument left_bound must be in range [0, 1]")
@@ -73,7 +73,7 @@ class InterpolatingCoefScheduler(AbstractCoefScheduler, ABC):
 class GeometricCoefScheduler(InterpolatingCoefScheduler):
     def __call__(self, args: CoefSchedulerArgs) -> float:
         ratio: float = self._ratio(args.batch)
-        return self.left_bound ** (1 - ratio) * self.right_bound ** ratio
+        return self.left_bound ** (1 - ratio) * self.right_bound**ratio
 
 
 class LinearCoefScheduler(InterpolatingCoefScheduler):
@@ -96,7 +96,9 @@ class AlphaSchedulerFactory(AbstractSchedulerFactory):
         scheduler_type: str = alpha_params["type"].lower()
 
         normal_batch_size = config["sent_by_T"] / config["num_splits"]
-        batch_sizes: Sequence[float] = [normal_batch_size] * config["num_splits"] + [config["sent_after_T"]]
+        batch_sizes: Sequence[float] = [normal_batch_size] * config["num_splits"] + [
+            config["sent_after_T"]
+        ]
 
         match scheduler_type:
             case "constant":
@@ -105,18 +107,16 @@ class AlphaSchedulerFactory(AbstractSchedulerFactory):
                 return GeometricCoefScheduler(
                     left_bound=alpha_params["left_bound"],
                     right_bound=alpha_params["right_bound"],
-                    batch_sizes=batch_sizes
+                    batch_sizes=batch_sizes,
                 )
             case "linear":
                 return LinearCoefScheduler(
                     left_bound=alpha_params["left_bound"],
                     right_bound=alpha_params["right_bound"],
-                    batch_sizes=batch_sizes
+                    batch_sizes=batch_sizes,
                 )
             case "adaptive":
-                return AdaptiveCoefScheduler(
-                    dumping=alpha_params["dumping"]
-                )
+                return AdaptiveCoefScheduler(dumping=alpha_params["dumping"])
             case _:
                 raise ValueError(f"Unknown scheduler type: {scheduler_type}")
 
@@ -131,7 +131,9 @@ class BetaSchedulerFactory(AbstractSchedulerFactory):
         scheduler_type: str = beta_params["type"].lower()
 
         normal_batch_size = config["sent_by_T"] / config["num_splits"]
-        batch_sizes: Sequence[float] = [normal_batch_size] * config["num_splits"] + [config["sent_after_T"]]
+        batch_sizes: Sequence[float] = [normal_batch_size] * config["num_splits"] + [
+            config["sent_after_T"]
+        ]
 
         match scheduler_type:
             case "constant":
@@ -140,17 +142,15 @@ class BetaSchedulerFactory(AbstractSchedulerFactory):
                 return GeometricCoefScheduler(
                     left_bound=beta_params["left_bound"],
                     right_bound=beta_params["right_bound"],
-                    batch_sizes=batch_sizes
+                    batch_sizes=batch_sizes,
                 )
             case "linear":
                 return LinearCoefScheduler(
                     left_bound=beta_params["left_bound"],
                     right_bound=beta_params["right_bound"],
-                    batch_sizes=batch_sizes
+                    batch_sizes=batch_sizes,
                 )
             case "adaptive":
-                return AdaptiveCoefScheduler(
-                    dumping=beta_params["dumping"]
-                )
+                return AdaptiveCoefScheduler(dumping=beta_params["dumping"])
             case _:
                 raise ValueError(f"Unknown scheduler type: {scheduler_type}")

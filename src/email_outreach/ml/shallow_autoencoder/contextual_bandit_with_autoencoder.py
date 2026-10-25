@@ -15,20 +15,29 @@ from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
     AbstractContextualModel,
 )
 
-from email_outreach.ml.shallow_autoencoder.config import ContextualBanditMetrics,ContextualBanditWithAutoencoderConfig
+from email_outreach.ml.shallow_autoencoder.config import (
+    ContextualBanditMetrics,
+    ContextualBanditWithAutoencoderConfig,
+)
 
 from email_outreach.ml.shallow_autoencoder.dataset.autoencoder_dataset import (
     AutoencoderDataset,
-    NegativeAutoencoderDataset
+    NegativeAutoencoderDataset,
 )
 from email_outreach.ml.shallow_autoencoder.model.autoencoder_chunked import (
-    ShallowAutoencoder
+    ShallowAutoencoder,
 )
 
-from email_outreach.ml.shallow_autoencoder.coef_scheduler import AbstractCoefScheduler, CoefSchedulerArgs, \
-    AlphaSchedulerFactory, BetaSchedulerFactory
-from email_outreach.ml.shallow_autoencoder.dataset.template_weight import AbstractTemplateWeight, TemplateWeightFactory
-
+from email_outreach.ml.shallow_autoencoder.coef_scheduler import (
+    AbstractCoefScheduler,
+    CoefSchedulerArgs,
+    AlphaSchedulerFactory,
+    BetaSchedulerFactory,
+)
+from email_outreach.ml.shallow_autoencoder.dataset.template_weight import (
+    AbstractTemplateWeight,
+    TemplateWeightFactory,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +50,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self.last_p: torch.Tensor = torch.zeros(0)
         self.last_prenormalized_f: torch.Tensor = torch.zeros(0)
 
-        self.alpha_scheduler: AbstractCoefScheduler = AlphaSchedulerFactory.from_config(config.to_dict())
-        self.beta_scheduler: AbstractCoefScheduler | None = BetaSchedulerFactory.from_config(config.to_dict())
+        self.alpha_scheduler: AbstractCoefScheduler = AlphaSchedulerFactory.from_config(
+            config.to_dict()
+        )
+        self.beta_scheduler: AbstractCoefScheduler | None = (
+            BetaSchedulerFactory.from_config(config.to_dict())
+        )
         self._template_weight: AbstractTemplateWeight | None = None
 
         self.config = config
@@ -82,25 +95,25 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return self._autoencoder
 
     def fit(
-            self,
-            train: AutoencoderDataset,
-            val: AutoencoderDataset,
+        self,
+        train: AutoencoderDataset,
+        val: AutoencoderDataset,
     ) -> None:
 
         # np.save(ROOT_FOLDER / "additional_data" / "X" /"train_X.npy", train._mailshot_embeddings)
 
         super().fit(train, val)
 
-        weight_config = self.config.to_dict() | {"min_template_id": self.train.min_template_id,
-                                                 "max_template_id": self.train.max_template_id}
+        weight_config = self.config.to_dict() | {
+            "min_template_id": self.train.min_template_id,
+            "max_template_id": self.train.max_template_id,
+        }
         self._template_weight = TemplateWeightFactory.from_config(weight_config)
 
         self._autoencoder = ShallowAutoencoder(
-                n=train.num_users,
-                d=self.config.d,
-                dropout_p=self.config.dropout
-            )
-        
+            n=train.num_users, d=self.config.d, dropout_p=self.config.dropout
+        )
+
         self.last_p: torch.Tensor = torch.zeros(train.num_users)
         self.last_prenormalized_f: torch.Tensor = torch.zeros(train.num_users)
 
@@ -120,7 +133,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 batch_size=self.config.batch_size,
                 weight_decay=self.config.wd,
                 positive_weight=self.config.negative_weight,
-                val=val
+                val=val,
             )
 
             # np.save(ROOT_FOLDER / "additional_data" / "D" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
@@ -132,7 +145,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             batch_size=self.config.batch_size,
             weight_decay=self.config.wd,
             positive_weight=self.config.positive_weight,
-            val=val
+            val=val,
         )
 
         # np.save(ROOT_FOLDER / "additional_data" / "D" /"sae_D.npy", self.autoencoder.D.detach().numpy())
@@ -157,7 +170,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
             # User's index: stage
             sent_at_stage: Dict[int, int] = {}
-            self.sent_at_stage = sent_at_stage  # same dict object; .update() below stays in sync
+            self.sent_at_stage = (
+                sent_at_stage  # same dict object; .update() below stays in sync
+            )
             all_current_opens: Set[int] = set()
             newly_opened: Set[int] = set()
 
@@ -169,7 +184,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                     opened,
                     initial_batch_size,
                     newly_opened,
-                    scheduler_args=CoefSchedulerArgs(batch=batch_i, open_frac=len(all_current_opens) / input_dim),
+                    scheduler_args=CoefSchedulerArgs(
+                        batch=batch_i, open_frac=len(all_current_opens) / input_dim
+                    ),
                 )
                 already_sent.extend(predicted_batch)
                 already_scored.extend(predicted_scores)
@@ -187,8 +204,13 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
             # Final prediction and metrics
             predictions: torch.Tensor = self.predict_final_send(
-                mailshot_users, already_sent, opened, newly_opened,
-                scheduler_args=CoefSchedulerArgs(batch=num_splits, open_frac=len(all_current_opens) / input_dim)
+                mailshot_users,
+                already_sent,
+                opened,
+                newly_opened,
+                scheduler_args=CoefSchedulerArgs(
+                    batch=num_splits, open_frac=len(all_current_opens) / input_dim
+                ),
             )
             metrics: List[ContextualBanditMetrics] = self.final_metrics(
                 mailshot_index, data, mailshot_users, already_sent, predictions
@@ -212,16 +234,14 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         # self.u_predictions = np.array(self.u_predictions)
         # self.pi_predictions = np.array(self.pi_predictions)
 
-
-
         return all_metrics
 
     @staticmethod
     def update_opens(
-            dataset: AutoencoderDataset,
-            mailshot_id: int,
-            sent_at_stage: Dict[int, int],
-            frame_minutes: int,
+        dataset: AutoencoderDataset,
+        mailshot_id: int,
+        sent_at_stage: Dict[int, int],
+        frame_minutes: int,
     ) -> List[int]:
         opened_indices: List[int] = []
         grouped_sent_at_stage = defaultdict(list)
@@ -256,12 +276,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return s
 
     def calculate_scores(
-            self,
-            user_indices: List[int],
-            sent_indices: List[int],
-            opened: torch.tensor,
-            newly_opened: Set[int],
-            scheduler_args: CoefSchedulerArgs
+        self,
+        user_indices: List[int],
+        sent_indices: List[int],
+        opened: torch.tensor,
+        newly_opened: Set[int],
+        scheduler_args: CoefSchedulerArgs,
     ) -> torch.Tensor:
         # Calculate p, f, s
 
@@ -280,7 +300,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         else:
             ps: torch.tensor = self.last_p
 
-    
         popularity: torch.tensor = self.calculate_popularity()
 
         p_phis = ps * popularity
@@ -308,13 +327,13 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return samples
 
     def predict_batch(
-            self,
-            user_indices: List[int],
-            sent_indices: List[int],
-            opened: torch.tensor,
-            n_best: int,
-            newly_opened: Set[int],
-            scheduler_args: CoefSchedulerArgs
+        self,
+        user_indices: List[int],
+        sent_indices: List[int],
+        opened: torch.tensor,
+        n_best: int,
+        newly_opened: Set[int],
+        scheduler_args: CoefSchedulerArgs,
     ) -> Tuple[List[int], List[float]]:
         # Calculate p, f, s
         samples = self.calculate_scores(
@@ -332,12 +351,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return mask
 
     def predict_final_send(
-            self,
-            user_indices: List[int],
-            sent_indices: List[int],
-            opened: torch.tensor,
-            newly_opened: Set[int],
-            scheduler_args: CoefSchedulerArgs
+        self,
+        user_indices: List[int],
+        sent_indices: List[int],
+        opened: torch.tensor,
+        newly_opened: Set[int],
+        scheduler_args: CoefSchedulerArgs,
     ) -> torch.Tensor:
         samples = self.calculate_scores(
             user_indices, sent_indices, opened, newly_opened, scheduler_args
@@ -345,12 +364,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return samples
 
     def final_metrics(
-            self,
-            mailshot_id: int,
-            dataset: AutoencoderDataset,
-            user_indices: List[int],
-            sent_indices: List[int],
-            final_predictions: torch.Tensor,
+        self,
+        mailshot_id: int,
+        dataset: AutoencoderDataset,
+        user_indices: List[int],
+        sent_indices: List[int],
+        final_predictions: torch.Tensor,
     ) -> List[ContextualBanditMetrics]:
         binary_results: torch.Tensor = dataset[mailshot_id][
             1
@@ -382,10 +401,11 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             raise ValueError("No template weight")
 
         if self._popularity_tensor is None:
-            self._popularity_tensor = self.train.popularity_tensor(self._template_weight)
+            self._popularity_tensor = self.train.popularity_tensor(
+                self._template_weight
+            )
 
         return self._popularity_tensor
-
 
     def calculate_p(self) -> torch.Tensor:
         batch_size = 256
@@ -399,10 +419,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             users = torch.zeros(end - start, input_dim)
             for i in range(start, end):
                 users[i - start, i] = 1
-            no_self_users =self.autoencoder.predict(users)
+            no_self_users = self.autoencoder.predict(users)
             for i in range(start, end):
                 no_self_users[i - start, i] = 0
-
 
             averages = no_self_users.mean(dim=1)
             variances = no_self_users.var(dim=1)
@@ -420,8 +439,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         # np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "avg.npy",
         #         np.array(max_average_row.detach().numpy(), dtype=np.float64))
 
-
-
         all_variances = torch.cat(all_variances)
 
         max_var_idx = torch.argmax(all_variances)
@@ -432,11 +449,11 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         # np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "var.npy",
         #         np.array(max_var_row.detach().numpy(), dtype=np.float64))
 
-
         # ==== ===
         from scipy.stats import rankdata
-        mean_ranking = rankdata(-all_averages, method='min')
-        var_ranking = rankdata(-all_variances, method='min')
+
+        mean_ranking = rankdata(-all_averages, method="min")
+        var_ranking = rankdata(-all_variances, method="min")
 
         rank_flips = torch.abs(torch.tensor(var_ranking - mean_ranking))
 
@@ -445,14 +462,20 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         biggest_rank_flip_vec[biggest_rank_flip] = 1
 
         sigma_row = self.autoencoder.predict(biggest_rank_flip_vec.unsqueeze(0))
-        np.save(ROOT_FOLDER / "additional_data" / "p_scores" / f"rank_flip_sigma_row.npy",
-                np.array(sigma_row.detach().numpy(), dtype=np.float64))
+        np.save(
+            ROOT_FOLDER / "additional_data" / "p_scores" / f"rank_flip_sigma_row.npy",
+            np.array(sigma_row.detach().numpy(), dtype=np.float64),
+        )
 
-        np.save(ROOT_FOLDER / "additional_data" / "p_scores" / f"p_mean.npy",
-                np.array(all_averages.detach().numpy(), dtype=np.float64))
+        np.save(
+            ROOT_FOLDER / "additional_data" / "p_scores" / f"p_mean.npy",
+            np.array(all_averages.detach().numpy(), dtype=np.float64),
+        )
 
-        np.save(ROOT_FOLDER / "additional_data" / "p_scores" / f"p_var.npy",
-                np.array(4*all_variances.detach().numpy(), dtype=np.float64))
+        np.save(
+            ROOT_FOLDER / "additional_data" / "p_scores" / f"p_var.npy",
+            np.array(4 * all_variances.detach().numpy(), dtype=np.float64),
+        )
 
         match self.config.p_type:
             case "mean":
@@ -465,7 +488,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 raise ValueError("Unknown p value")
 
     def calculate_f(
-            self, results: torch.Tensor, newly_opened: Set[int]
+        self, results: torch.Tensor, newly_opened: Set[int]
     ) -> torch.Tensor:
         if results.sum() == 0:
             self.last_prenormalized_f = torch.zeros_like(results)
@@ -492,11 +515,13 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             return normalized_f
 
     def non_naive_f(
-            self, results: torch.Tensor, sent_indices: List[int]
+        self, results: torch.Tensor, sent_indices: List[int]
     ) -> torch.Tensor:
 
         if not self.config.double_sae:
-            current_f = torch.sigmoid(self.autoencoder.predict_logit(results) * self.config.f_confidence)
+            current_f = torch.sigmoid(
+                self.autoencoder.predict_logit(results) * self.config.f_confidence
+            )
         else:
             sent_tensor = torch.as_tensor(sent_indices, dtype=torch.long)
             unopened = sent_tensor[results[sent_tensor] == 0]
@@ -506,14 +531,22 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             pos_logit = self.autoencoder.predict_logit(results)
             neg_logit = self._negative_autoencoder.predict_logit(negative_results)
             current_f = torch.sigmoid(
-                ((1-self.config.negative_feedback_ratio) * pos_logit - self.config.negative_feedback_ratio * neg_logit) * self.config.f_confidence
+                (
+                    (1 - self.config.negative_feedback_ratio) * pos_logit
+                    - self.config.negative_feedback_ratio * neg_logit
+                )
+                * self.config.f_confidence
             )
 
         return current_f
 
-
-    def calculate_s(self, p: torch.Tensor, f: torch.Tensor, scheduler_args: CoefSchedulerArgs) -> torch.Tensor:
-        s = self.alpha_scheduler(scheduler_args) * p + (1 - self.alpha_scheduler(scheduler_args)) * f
+    def calculate_s(
+        self, p: torch.Tensor, f: torch.Tensor, scheduler_args: CoefSchedulerArgs
+    ) -> torch.Tensor:
+        s = (
+            self.alpha_scheduler(scheduler_args) * p
+            + (1 - self.alpha_scheduler(scheduler_args)) * f
+        )
         return s
 
     @staticmethod
@@ -523,5 +556,3 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         betas = torch.clamp((1 - s) * G, min=1e-12)
         samples = torch.distributions.Beta(alphas, betas).sample()
         return samples
-
-

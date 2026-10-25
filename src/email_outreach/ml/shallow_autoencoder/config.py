@@ -22,14 +22,10 @@ class ContextualBanditMetrics:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "mailshot_id": (
-                int(self.mailshot_id)
-            ),
+            "mailshot_id": (int(self.mailshot_id)),
             "present_in_prediction": bool(self.present_in_prediction),
             "opened": bool(self.opened),
-            "prediction": (
-                float(self.prediction)
-            ),
+            "prediction": (float(self.prediction)),
             "stage": int(self.stage),
         }
 
@@ -63,9 +59,7 @@ class ContextualBanditMetrics:
                 instances.append(
                     cls(
                         mailshot_id=int(row["mailshot_id"]),
-                        present_in_prediction=bool(
-                            row["present_in_prediction"]
-                        ),
+                        present_in_prediction=bool(row["present_in_prediction"]),
                         opened=bool(row["opened"]),
                         prediction=float(row["prediction"]),
                         stage=(
@@ -80,12 +74,12 @@ class ContextualBanditMetrics:
 
     @classmethod
     def from_lists(
-            cls,
-            mailshot_id: int,
-            present_in_prediction: list[bool],
-            opened: list[bool],
-            prediction: list[float],
-            user_clusters: list[int],
+        cls,
+        mailshot_id: int,
+        present_in_prediction: list[bool],
+        opened: list[bool],
+        prediction: list[float],
+        user_clusters: list[int],
     ) -> list[Self]:
         return [
             cls(mailshot_id, o, pred, p, cluster)
@@ -93,7 +87,6 @@ class ContextualBanditMetrics:
                 present_in_prediction, opened, prediction, user_clusters
             )
         ]
-
 
 
 @dataclass
@@ -104,9 +97,13 @@ class ContextualBanditWithAutoencoderConfig:
     wd: float = 0.0001
     batch_size: int = 16
     positive_weight: float = 100.0
-    alpha_params: dict[str, Any] = field(default_factory=lambda: {"type": "constant", "alpha": 0.1})
+    alpha_params: dict[str, Any] = field(
+        default_factory=lambda: {"type": "constant", "alpha": 0.1}
+    )
     beta_params: dict[str, Any] = field(default_factory=lambda: {})
-    template_weight_params: dict[str, Any] = field(default_factory=lambda: {"type": "uniform"})
+    template_weight_params: dict[str, Any] = field(
+        default_factory=lambda: {"type": "uniform"}
+    )
     G: float = 10000.0
     naive_f: bool = True
     revised_s: bool = False
@@ -122,7 +119,6 @@ class ContextualBanditWithAutoencoderConfig:
     negative_weight: float = 0.1
     f_confidence: float = 1.0
     negative_feedback_ratio: float = 0.1
-
 
     def to_dict(self):
         return {
@@ -149,7 +145,7 @@ class ContextualBanditWithAutoencoderConfig:
             "double_sae": self.double_sae,
             "negative_weight": self.negative_weight,
             "f_confidence": self.f_confidence,
-            "negative_feedback_ratio": self.negative_feedback_ratio
+            "negative_feedback_ratio": self.negative_feedback_ratio,
         }
 
     @classmethod
@@ -162,5 +158,3 @@ class ContextualBanditWithAutoencoderConfig:
     def to_json_file(self, folder: Path, filename: str = "config.json") -> None:
         with open(folder / filename, "w") as f:
             json.dump(self.to_dict(), f, indent=4)
-
-
