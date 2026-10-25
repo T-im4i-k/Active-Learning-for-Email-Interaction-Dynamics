@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
@@ -16,39 +15,7 @@ from email_outreach.utils.common_utils import set_seed
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class TrainingMetrics:
-    loss: float
-    average_train_ndcg: float | None
-    average_ndcg: float | None
-    average_f1: float | None
-    recall: float | None
-    precision: float | None
-    val_loss: float | None
-    val_average_ndcg: float | None
-    val_average_f1: float | None
-    val_average_iou: float | None
-
-    def __str__(self):
-        return f"loss: {self.loss:.4f}, val (masked) NDCG: {self.average_ndcg:.4f}, val (masked) f1: {self.average_f1:.4f}, val loss: {self.val_loss:.4f}, val NDCG: {self.val_average_ndcg:.4f}, val f1: {self.val_average_f1:.4f}"
-
-
 class ShallowAutoencoder(nn.Module):
-    """
-    Shallow linear autoencoder based on the formulation:
-
-       B_{E,D} = E D^T - diag([E ⊙ D] 1_n)
-       X B_{E,D} = X E D^T - X diag([E ⊙ D] 1_n)
-
-    E, D in R^{n x d} are trainable parameters (n = #items or #features, d = latent dimension).
-    diag(...) ensures the diagonal is zeroed out, avoiding trivial solutions.
-
-    n - usually around 100K (users or features)
-    d - latent dimension, usually 8-20
-    number of rows usually 100 templates
-    """
-
     def __init__(
         self,
         n: int,
@@ -91,12 +58,13 @@ class ShallowAutoencoder(nn.Module):
         weight_decay,
         positive_weight,
     ):
+        set_seed()
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
         optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
         criterion = nn.BCELoss(reduction="none")
 
-        for epoch in range(epochs):
+        for _ in range(epochs):
             self.train()
             for batch_data, target_data in train_loader:
                 optimizer.zero_grad()

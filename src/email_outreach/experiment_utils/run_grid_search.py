@@ -9,7 +9,7 @@ from email_outreach.experiment_utils.experiment_constants import (
     GRID_SEARCH_FILE_NAME,
     get_experiment_folder_path,
 )
-from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
+from email_outreach.ml.shallow_autoencoder.sae_based_mab import (
     ContextualBanditWithAutoencoder,
 )
 

@@ -12,7 +12,7 @@ from email_outreach.experiment_utils.experiment_constants import (
 from email_outreach.ml.shallow_autoencoder.abstract_contextual_model import (
     AbstractContextualModel,
 )
-from email_outreach.ml.shallow_autoencoder.autoencoder_chunked import ShallowAutoencoder
+from email_outreach.ml.shallow_autoencoder.sae import ShallowAutoencoder
 from email_outreach.ml.shallow_autoencoder.coef_scheduler import (
     AbstractCoefScheduler,
     AlphaSchedulerFactory,
@@ -23,7 +23,7 @@ from email_outreach.ml.shallow_autoencoder.config import (
     ContextualBanditMetrics,
     ContextualBanditWithAutoencoderConfig,
 )
-from email_outreach.ml.shallow_autoencoder.autoencoder_dataset import (
+from email_outreach.ml.shallow_autoencoder.dataset import (
     AutoencoderDataset,
     NegativeAutoencoderDataset,
 )

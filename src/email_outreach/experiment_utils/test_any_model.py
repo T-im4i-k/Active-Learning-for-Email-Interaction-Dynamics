@@ -7,7 +7,7 @@ from pathlib import Path
 from email_outreach.experiment_utils.experiment_constants import (
     EXPERIMENT_RESULTS_FOLDER_NAME,
 )
-from email_outreach.ml.shallow_autoencoder.contextual_bandit_with_autoencoder import (
+from email_outreach.ml.shallow_autoencoder.sae_based_mab import (
     ContextualBanditWithAutoencoder,
 )
 

@@ -18,7 +18,7 @@ from email_outreach.ml.shallow_autoencoder.config import (
     ContextualBanditMetrics,
     ContextualBanditWithAutoencoderConfig,
 )
-from email_outreach.ml.shallow_autoencoder.autoencoder_dataset import (
+from email_outreach.ml.shallow_autoencoder.dataset import (
     AutoencoderDataset,
 )
 from email_outreach.ml.shallow_autoencoder.metrics import (
