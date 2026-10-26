@@ -3,7 +3,7 @@ from typing import Sequence
 
 import numpy as np
 
-from email_outreach.ml.shallow_autoencoder.config import ContextualBanditMetrics
+from email_outreach.sae_based_mab.config import ContextualBanditMetrics
 
 
 def calculate_recall_precision_at_quantiles(

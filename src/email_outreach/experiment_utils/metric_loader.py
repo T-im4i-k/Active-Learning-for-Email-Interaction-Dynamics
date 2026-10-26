@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from email_outreach.ml.shallow_autoencoder.sae_based_mab import (
+from email_outreach.sae_based_mab.sae_based_mab import (
     ContextualBanditMetrics,
 )
 

@@ -11,26 +11,26 @@ from functools import cached_property
 from email_outreach.experiment_utils.experiment_constants import (
     CONTEXTUAL_BANDIT_FOLDER_NAME,
 )
-from email_outreach.ml.shallow_autoencoder.abstract_mab import (
+from email_outreach.sae_based_mab.abstract_mab import (
     AbstractContextualModel,
 )
-from email_outreach.ml.shallow_autoencoder.sae import ShallowAutoencoder
-from email_outreach.ml.shallow_autoencoder.coef_scheduler import (
+from email_outreach.sae_based_mab.sae import ShallowAutoencoder
+from email_outreach.sae_based_mab.coef_scheduler import (
     AbstractCoefScheduler,
     AlphaSchedulerFactory,
     BetaSchedulerFactory,
     CoefSchedulerArgs,
 )
-from email_outreach.ml.shallow_autoencoder.config import (
+from email_outreach.sae_based_mab.config import (
     ContextualBanditMetrics,
     ContextualBanditWithAutoencoderConfig,
 )
-from email_outreach.ml.shallow_autoencoder.dataset import (
+from email_outreach.sae_based_mab.dataset import (
     AutoencoderDataset,
     PositiveAutoencoderDataset,
     NegativeAutoencoderDataset,
 )
-from email_outreach.ml.shallow_autoencoder.template_weight import (
+from email_outreach.sae_based_mab.template_weight import (
     AbstractTemplateWeight,
     TemplateWeightFactory,
 )

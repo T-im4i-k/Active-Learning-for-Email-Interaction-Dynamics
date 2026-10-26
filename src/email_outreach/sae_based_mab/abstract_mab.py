@@ -14,14 +14,14 @@ from email_outreach.experiment_utils.experiment_constants import (
     get_experiment_folder_path,
     get_test_folder_path,
 )
-from email_outreach.ml.shallow_autoencoder.config import (
+from email_outreach.sae_based_mab.config import (
     ContextualBanditMetrics,
     ContextualBanditWithAutoencoderConfig,
 )
-from email_outreach.ml.shallow_autoencoder.dataset import (
+from email_outreach.sae_based_mab.dataset import (
     AutoencoderDataset,
 )
-from email_outreach.ml.shallow_autoencoder.metrics import (
+from email_outreach.sae_based_mab.metrics import (
     calculate_auc,
     calculate_recall_precision_at_quantiles,
 )
