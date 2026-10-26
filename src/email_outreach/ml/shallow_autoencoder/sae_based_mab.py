@@ -61,8 +61,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         self._naive_f_partial: torch.Tensor | None = None
 
-
-
     @classmethod
     def model_name(cls) -> str:
         return CONTEXTUAL_BANDIT_FOLDER_NAME
@@ -238,8 +236,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         return opened_indices
 
-
-# ===== p ===== 
+    # ===== p =====
     @cached_property
     def p_score(self) -> torch.Tensor:
         batch_size = 256
@@ -276,8 +273,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             case _:
                 raise ValueError("Unknown p value")
 
-
-# ===== f =====
+    # ===== f =====
 
     def calculate_f(
         self, results: torch.Tensor, newly_opened: set[int]
@@ -336,10 +332,14 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             case False:
                 return self.non_naive_f(opened, sent_indices)
 
-# ===== s =====
+    # ===== s =====
 
     def calculate_s(
-        self, phi: torch.Tensor, p: torch.Tensor, f: torch.Tensor, scheduler_args: CoefSchedulerArgs
+        self,
+        phi: torch.Tensor,
+        p: torch.Tensor,
+        f: torch.Tensor,
+        scheduler_args: CoefSchedulerArgs,
     ) -> torch.Tensor:
         s = (
             self.alpha_scheduler(scheduler_args) * phi * p
@@ -360,21 +360,25 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         return s
 
-    def get_s(self, phi: torch.Tensor, p: torch.Tensor, f: torch.Tensor, scheduler_args: CoefSchedulerArgs) -> torch.Tensor:
+    def get_s(
+        self,
+        phi: torch.Tensor,
+        p: torch.Tensor,
+        f: torch.Tensor,
+        scheduler_args: CoefSchedulerArgs,
+    ) -> torch.Tensor:
         match self.config.revised_s:
             case False:
                 return self.calculate_s(phi, p, f, scheduler_args)
             case True:
                 return self.calculate_s_revised(phi, p, f, scheduler_args)
 
-# ===== phi =====
+    # ===== phi =====
     @cached_property
     def phi_score(self) -> torch.Tensor:
-        return self.train.popularity_tensor(
-                self._template_weight
-            )
+        return self.train.popularity_tensor(self._template_weight)
 
-# ===== TS MAB =====
+    # ===== TS MAB =====
 
     def calculate_scores(
         self,
@@ -480,27 +484,40 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
 # ===== Additional =====
 
-def max_p_sigma_rows(autoencoder: ShallowAutoencoder, all_averages: torch.Tensor, all_variances: torch.Tensor) -> None:
+
+def max_p_sigma_rows(
+    autoencoder: ShallowAutoencoder,
+    all_averages: torch.Tensor,
+    all_variances: torch.Tensor,
+) -> None:
     max_average_idx = torch.argmax(all_averages)
     max_average_input = torch.zeros(autoencoder.n)
     max_average_input[max_average_idx] = 1
 
     max_average_row = autoencoder.predict(max_average_input)
-    np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "avg.npy",
-            np.array(max_average_row.detach().numpy(), dtype=np.float64))
+    np.save(
+        ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "avg.npy",
+        np.array(max_average_row.detach().numpy(), dtype=np.float64),
+    )
 
     max_var_idx = torch.argmax(all_variances)
     max_var_input = torch.zeros(autoencoder.n)
     max_var_input[max_var_idx] = 1
 
     max_var_row = autoencoder.predict(max_var_input)
-    np.save(ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "var.npy",
-            np.array(max_var_row.detach().numpy(), dtype=np.float64))
+    np.save(
+        ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "var.npy",
+        np.array(max_var_row.detach().numpy(), dtype=np.float64),
+    )
 
 
-def max_p_rank_flip_sigma_row(autoencoder: ShallowAutoencoder, all_averages: torch.Tensor, all_variances: torch.Tensor):
+def max_p_rank_flip_sigma_row(
+    autoencoder: ShallowAutoencoder,
+    all_averages: torch.Tensor,
+    all_variances: torch.Tensor,
+):
     from scipy.stats import rankdata
-    
+
     mean_ranking = rankdata(-all_averages, method="min")
     var_ranking = rankdata(-all_variances, method="min")
 

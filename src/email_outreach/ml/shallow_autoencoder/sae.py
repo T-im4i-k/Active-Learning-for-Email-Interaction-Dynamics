@@ -15,6 +15,7 @@ from email_outreach.utils.common_utils import set_seed
 
 logger = logging.getLogger(__name__)
 
+
 class ShallowAutoencoder(nn.Module):
     def __init__(self, n: int, d: int, dropout_p=0.0):
         super().__init__()

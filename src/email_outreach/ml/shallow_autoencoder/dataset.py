@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 REQUIRED_COLUMNS = ("mailshot_id", "user_id", "opened", "time_to_open")
 MIN_MAILS_PER_MAILSHOT = 100
 
+
 # --------------------------------------------------------------------------- #
 # Pure helpers
 # --------------------------------------------------------------------------- #
@@ -75,6 +76,7 @@ def _simulate_time_to_open(mails: pd.DataFrame) -> dict[int, pd.Series]:
         for mailshot_id, group in by_pair.groupby("mailshot_id")
     }
 
+
 def _clean_mails(mails: pd.DataFrame) -> pd.DataFrame:
     mails = mails[list(REQUIRED_COLUMNS)]
     mails = mails[
@@ -113,7 +115,9 @@ class AutoencoderDataset(Dataset):
         self.mails: pd.DataFrame = mails.assign(
             user_id=mails["user_id"].map(user_id_mapper)
         )
-        self.mailshot_ids: list[int] = sorted(self.mails["mailshot_id"].unique().tolist())
+        self.mailshot_ids: list[int] = sorted(
+            self.mails["mailshot_id"].unique().tolist()
+        )
         self._row_of_mailshot = {m: row for row, m in enumerate(self.mailshot_ids)}
 
         self.opens, self.non_opens = _wide_matrices(
@@ -200,7 +204,9 @@ class AutoencoderDataset(Dataset):
     def sends(self) -> np.ndarray:
         return np.maximum(self.opens, self.non_opens)
 
-    def popularity_tensor(self, template_weight: AbstractTemplateWeight) -> torch.Tensor:
+    def popularity_tensor(
+        self, template_weight: AbstractTemplateWeight
+    ) -> torch.Tensor:
         weights = pd.Series(self.mailshot_ids).map(template_weight).to_numpy(np.float64)
         weighted_opens = weights @ self.opens
         weighted_sends = weights @ self.sends
@@ -212,7 +218,6 @@ class AutoencoderDataset(Dataset):
         )
         return torch.tensor(rate, dtype=torch.float64)
 
-
     def __len__(self) -> int:
         return len(self.opens)
 
@@ -222,7 +227,9 @@ class AutoencoderDataset(Dataset):
 
 
 class PositiveAutoencoderDataset(Dataset):
-    def __init__(self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0) -> None:
+    def __init__(
+        self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0
+    ) -> None:
         self.dataset = autoencoder_dataset
         self.noise = noise
 
@@ -238,7 +245,9 @@ class PositiveAutoencoderDataset(Dataset):
 
 
 class NegativeAutoencoderDataset(Dataset):
-    def __init__(self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0) -> None:
+    def __init__(
+        self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0
+    ) -> None:
         self.dataset = autoencoder_dataset
         self.noise = noise
 
