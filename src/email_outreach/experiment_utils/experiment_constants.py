@@ -1,4 +1,3 @@
-import datetime
 from pathlib import Path
 
 from email_outreach.utils.constants import ROOT_FOLDER

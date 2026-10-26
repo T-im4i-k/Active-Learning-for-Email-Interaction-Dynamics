@@ -111,7 +111,7 @@ class ContextualBanditWithAutoencoderConfig:
     j: int = 0
     dropout: float = 0.0
     p_type: Literal["mean", "var", "std"] = "mean"
-    noise_params: dict = field(default_factory=lambda: {})
+    noise: float = 0.0
     double_sae: bool = False
     negative_weight: float = 0.1
     f_confidence: float = 1.0
@@ -138,7 +138,7 @@ class ContextualBanditWithAutoencoderConfig:
             "dropout": self.dropout,
             "j": self.j,
             "p_type": self.p_type,
-            "noise_params": self.noise_params,
+            "noise": self.noise,
             "double_sae": self.double_sae,
             "negative_weight": self.negative_weight,
             "f_confidence": self.f_confidence,

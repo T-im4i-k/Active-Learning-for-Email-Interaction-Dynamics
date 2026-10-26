@@ -2,13 +2,10 @@ import logging
 from collections import defaultdict
 from copy import deepcopy
 from functools import cached_property
-from typing import Type
 
 import numpy as np
 import torch
 
-from email_outreach.experiment_utils.experiment_constants import \
-    CONTEXTUAL_BANDIT_FOLDER_NAME
 from email_outreach.sae_based_mab.abstract_mab import AbstractContextualModel
 from email_outreach.sae_based_mab.coef_scheduler import (AbstractCoefScheduler,
                                                          AlphaSchedulerFactory,
@@ -50,18 +47,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         self._naive_f_partial: torch.Tensor | None = None
 
-    @classmethod
-    def model_name(cls) -> str:
-        return CONTEXTUAL_BANDIT_FOLDER_NAME
-
-    @classmethod
-    def config_class(cls) -> Type[ContextualBanditWithAutoencoderConfig]:
-        return ContextualBanditWithAutoencoderConfig
-
-    @classmethod
-    def metrics_class(cls) -> Type[ContextualBanditMetrics]:
-        return ContextualBanditMetrics
-
     @property
     def autoencoder(self) -> ShallowAutoencoder:
         if self._autoencoder is None:
@@ -98,7 +83,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             )
 
             self._negative_autoencoder.fit(
-                NegativeAutoencoderDataset(train),
+                NegativeAutoencoderDataset(train, noise=self.config.noise),
                 val=NegativeAutoencoderDataset(val),
                 epochs=self.config.epochs,
                 lr=self.config.lr,
@@ -110,7 +95,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             # np.save(ROOT_FOLDER / "additional_data" / "D" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
 
         self.autoencoder.fit(
-            PositiveAutoencoderDataset(train),
+            PositiveAutoencoderDataset(train, noise=self.config.noise),
             val=PositiveAutoencoderDataset(val),
             epochs=self.config.epochs,
             lr=self.config.lr,
@@ -132,8 +117,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         initial_batch_size: int = int(self.train.num_users * sent_by_T / num_splits)
 
         for mailshot_index, mailshot_id in enumerate(data.mailshot_ids):
-            # logger.info(f"-----------------------------------")
-            # logger.info(f"Predicting for mailshot {mailshot_id}")
             already_sent: list[int] = []  # list of already sent users
             already_scored: list[float] = []  # list of scores for already sent users
             opened: torch.tensor = torch.zeros(input_dim)
@@ -211,7 +194,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
     ) -> list[int]:
         opened_indices: list[int] = []
         grouped_sent_at_stage = defaultdict(list)
-        # logger.info(f"Updating opens for mailshot {mailshot_id}, keys: {set(sent_at_stage.values())}")
         max_stage = max(sent_at_stage.values())
         for user, stage in sent_at_stage.items():
             grouped_sent_at_stage[stage].append(user)
@@ -402,15 +384,13 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         newly_opened: set[int],
         scheduler_args: CoefSchedulerArgs,
     ) -> tuple[list[int], list[float]]:
-        # Calculate p, f, s
         samples = self.calculate_scores(
             user_indices, sent_indices, opened, newly_opened, scheduler_args
         )
 
-        # Select indices of top N samples
         top_indices: list[int] = torch.topk(samples, n_best).indices.tolist()
         top_scores: list[float] = samples[top_indices].tolist()
-        return top_indices, top_scores  # Return top N indices as list and their scores
+        return top_indices, top_scores
 
     def user_indices_to_mask(self, user_indices: list[int]) -> torch.tensor:
         mask = torch.zeros(self.train.num_users, dtype=torch.bool)
