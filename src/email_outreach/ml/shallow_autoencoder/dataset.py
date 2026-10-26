@@ -222,23 +222,32 @@ class AutoencoderDataset(Dataset):
 
 
 class PositiveAutoencoderDataset(Dataset):
-    def __init__(self, autoencoder_dataset: AutoencoderDataset) -> None:
+    def __init__(self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0) -> None:
         self.dataset = autoencoder_dataset
+        self.noise = noise
 
     def __len__(self) -> int:
         return len(self.dataset)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        x = torch.tensor(self.dataset[index])
+        x = torch.tensor(self.dataset[index], dtype=torch.float32)
+        if self.noise > 0.0:
+            mask = torch.bernoulli(torch.full_like(x, 1.0 - self.noise))
+            return x * mask, x
         return x, x
 
+
 class NegativeAutoencoderDataset(Dataset):
-    def __init__(self, autoencoder_dataset: AutoencoderDataset) -> None:
+    def __init__(self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0) -> None:
         self.dataset = autoencoder_dataset
+        self.noise = noise
 
     def __len__(self) -> int:
         return len(self.dataset)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        x = torch.tensor(self.dataset[index])
+        x = torch.tensor(self.dataset[index], dtype=torch.float32)
+        if self.noise > 0.0:
+            mask = torch.bernoulli(torch.full_like(x, 1.0 - self.noise))
+            return x * mask, x
         return x, x
