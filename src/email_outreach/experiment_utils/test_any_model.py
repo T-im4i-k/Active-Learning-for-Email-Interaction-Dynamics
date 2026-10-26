@@ -1,8 +1,5 @@
 import argparse
 import logging
-import re
-import sys
-from pathlib import Path
 
 from email_outreach.experiment_utils.experiment_constants import \
     EXPERIMENT_RESULTS_FOLDER_NAME

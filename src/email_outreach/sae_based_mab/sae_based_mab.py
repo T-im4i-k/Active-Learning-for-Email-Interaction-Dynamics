@@ -239,12 +239,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         for index in newly_opened:
             user = torch.zeros_like(results)
             user[index] = 1
-            if self.config.layer_norm:
-                current_f = self.autoencoder.predict(user.unsqueeze(0)).squeeze(0)
-            else:
-                current_f = self.autoencoder.predict_for_user(
-                    user.unsqueeze(0)
-                ).squeeze(0)
+
+            current_f = self.autoencoder.predict(user.unsqueeze(0)).squeeze(0)
             f += current_f
 
         self._naive_f_partial += f

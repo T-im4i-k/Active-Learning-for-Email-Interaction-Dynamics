@@ -134,7 +134,7 @@ def main():
 
     model_class = ContextualBanditWithAutoencoder
     results_folder = get_experiment_folder_path(
-        sender_id, model_class.model_name(), version
+        sender_id, ContextualBanditWithAutoencoder.MODEL_NAME, version
     )
     config: Dict[str, Any] = load_config(config_folder=results_folder)
 
@@ -142,7 +142,6 @@ def main():
     param_grid = config["param_grid"]
     random_state = config.get("random_state", 42)
 
-    logger.info(f"Starting grid search for model: {model_name}")
     logger.info(f"Sender ID: {sender_id}")
     logger.info(f"Version: {version}")
     logger.info(f"Split sizes: {split_sizes}")
