@@ -124,10 +124,15 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                     mailshot_users,
                     already_sent,
                     opened,
-                    int(self._train.num_users * self.config.sent_by_T / self.config.num_splits),
+                    int(
+                        self._train.num_users
+                        * self.config.sent_by_T
+                        / self.config.num_splits
+                    ),
                     newly_opened,
                     scheduler_args=CoefSchedulerArgs(
-                        batch=batch_i, open_frac=len(all_current_opens) / self._train.num_users
+                        batch=batch_i,
+                        open_frac=len(all_current_opens) / self._train.num_users,
                     ),
                 )
                 already_sent.extend(predicted_batch)
@@ -135,7 +140,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 self.sent_at_stage.update({user: batch_i for user in predicted_batch})
                 opens_from_batch: set[int] = set(
                     self.update_opens(
-                        data, mailshot_id, self.sent_at_stage, int(self.config.T / self.config.num_splits)
+                        data,
+                        mailshot_id,
+                        self.sent_at_stage,
+                        int(self.config.T / self.config.num_splits),
                     )
                 )
                 newly_opened = opens_from_batch - all_current_opens
@@ -148,7 +156,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 opened,
                 newly_opened,
                 scheduler_args=CoefSchedulerArgs(
-                    batch=self.config.num_splits, open_frac=len(all_current_opens) / self._train.num_users
+                    batch=self.config.num_splits,
+                    open_frac=len(all_current_opens) / self._train.num_users,
                 ),
             )
             metrics: list[ContextualBanditMetrics] = self.final_metrics(

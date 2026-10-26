@@ -16,7 +16,15 @@ def _group_by_mailshot(metrics: list[ContextualBanditMetrics]):
 
 def calculate_recall_precision_at_quantiles(
     metrics: list[ContextualBanditMetrics],
-    quantiles: Sequence[float] = (0.05, 0.15, 0.25, 0.35, 0.5, 0.75, 0.85),
+    quantiles: Sequence[float] = (
+        1 - 0.85,
+        1 - 0.75,
+        1 - 0.5,
+        1 - 0.35,
+        1 - 0.25,
+        1 - 0.15,
+        1 - 0.05,
+    ),
 ) -> tuple[list[float], list[float], list[float]]:
     q = np.asarray(quantiles, dtype=np.float64)
     rec_sum = np.zeros(q.size, dtype=np.float64)

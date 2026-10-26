@@ -122,7 +122,9 @@ class ShallowAutoencoder(nn.Module):
                 scheduler.get_last_lr()[0],
             )
 
-            print(f"Epoch {epoch}/{epochs} - train_loss: {train_loss:.6f} - val_loss: {val_loss:.6f} - lr: {scheduler.get_last_lr()[0]:.2e}")
+            print(
+                f"Epoch {epoch}/{epochs} - train_loss: {train_loss:.6f} - val_loss: {val_loss:.6f} - lr: {scheduler.get_last_lr()[0]:.2e}"
+            )
 
         return self.training_metrics
 

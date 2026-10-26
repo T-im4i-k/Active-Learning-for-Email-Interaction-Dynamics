@@ -71,9 +71,7 @@ class ContextualBanditMetrics:
     ) -> list[Self]:
         return [
             cls(mailshot_id, o, pred, p)
-            for p, o, pred in zip(
-                present_in_prediction, opened, prediction
-            )
+            for p, o, pred in zip(present_in_prediction, opened, prediction)
         ]
 
 
