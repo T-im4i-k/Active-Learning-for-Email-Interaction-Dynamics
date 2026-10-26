@@ -62,8 +62,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         super().fit(train, val)
 
         weight_config = self.config.to_dict() | {
-            "min_template_id": self.train.min_template_id,
-            "max_template_id": self.train.max_template_id,
+            "min_template_id": train.min_template_id,
+            "max_template_id": train.max_template_id,
         }
         self._template_weight = TemplateWeightFactory.from_config(weight_config)
 
@@ -109,80 +109,62 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
     def predict(self, data: AutoencoderDataset) -> list[ContextualBanditMetrics]:
         all_metrics: list[ContextualBanditMetrics] = []
-        input_dim = self.train.num_users
-        T: int = self.config.T
-        num_splits: int = self.config.num_splits  # number of splits
-        sent_by_T: float = self.config.sent_by_T
-        time_frame_minutes: int = int(T / num_splits)
-        initial_batch_size: int = int(self.train.num_users * sent_by_T / num_splits)
 
         for mailshot_index, mailshot_id in enumerate(data.mailshot_ids):
-            already_sent: list[int] = []  # list of already sent users
-            already_scored: list[float] = []  # list of scores for already sent users
-            opened: torch.tensor = torch.zeros(input_dim)
+            already_sent: list[int] = []
+            already_scored: list[float] = []
+            opened: torch.tensor = torch.zeros(self._train.num_users)
             mailshot_users: list[int] = data.mailshot_user_indices(mailshot_id)
 
-            # User's index: stage
-            sent_at_stage: dict[int, int] = {}
-            self.sent_at_stage = (
-                sent_at_stage  # same dict object; .update() below stays in sync
-            )
             all_current_opens: set[int] = set()
             newly_opened: set[int] = set()
 
-            for batch_i in range(num_splits):
-                # logger.info(f"Predicting batch {i}")
+            for batch_i in range(self.config.num_splits):
                 predicted_batch, predicted_scores = self.predict_batch(
                     mailshot_users,
                     already_sent,
                     opened,
-                    initial_batch_size,
+                    int(self._train.num_users * self.config.sent_by_T / self.config.num_splits),
                     newly_opened,
                     scheduler_args=CoefSchedulerArgs(
-                        batch=batch_i, open_frac=len(all_current_opens) / input_dim
+                        batch=batch_i, open_frac=len(all_current_opens) / self._train.num_users
                     ),
                 )
                 already_sent.extend(predicted_batch)
                 already_scored.extend(predicted_scores)
-                sent_at_stage.update({user: batch_i for user in predicted_batch})
+                self.sent_at_stage.update({user: batch_i for user in predicted_batch})
                 opens_from_batch: set[int] = set(
                     self.update_opens(
-                        data, mailshot_id, sent_at_stage, time_frame_minutes
+                        data, mailshot_id, self.sent_at_stage, int(self.config.T / self.config.num_splits)
                     )
                 )
                 newly_opened = opens_from_batch - all_current_opens
-                # print(newly_opened)
                 all_current_opens.update(opens_from_batch)
                 opened[list(opens_from_batch)] = 1
-                current_opens = len(opens_from_batch)
 
-            # Final prediction and metrics
             predictions: torch.Tensor = self.predict_final_send(
                 mailshot_users,
                 already_sent,
                 opened,
                 newly_opened,
                 scheduler_args=CoefSchedulerArgs(
-                    batch=num_splits, open_frac=len(all_current_opens) / input_dim
+                    batch=self.config.num_splits, open_frac=len(all_current_opens) / self._train.num_users
                 ),
             )
             metrics: list[ContextualBanditMetrics] = self.final_metrics(
                 mailshot_index, data, mailshot_users, already_sent, predictions
             )
             for m in metrics:
-                m.stage = num_splits
+                m.stage = self.config.num_splits
 
-            # Update metrics for already sent users (in the initial stages)
-            for user, stage in sent_at_stage.items():
+            for user, stage in self.sent_at_stage.items():
                 metrics[user].stage = stage
             for user, score in zip(already_sent, already_scored):
                 metrics[user].prediction = score
 
             all_metrics.extend(metrics)
-            print("Saving results")
 
         self.calculated_metrics = all_metrics
-
         return all_metrics
 
     @staticmethod
@@ -211,7 +193,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
     @cached_property
     def p_score(self) -> torch.Tensor:
         batch_size = 256
-        input_dim = self.train.num_users
+        input_dim = self._train.num_users
 
         all_averages = []
         all_variances = []
@@ -319,9 +301,6 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return s
 
     def calculate_s_revised(self, phi, p, f, scheduler_args: CoefSchedulerArgs):
-        # 𝑠𝑗 = 𝛼*𝑝_𝑗 + (1 − 𝛼)*𝑓_𝑗(𝑡)
-        if self.beta_scheduler is None:
-            raise ValueError("Beta scheduler has not been initialized")
         alpha = self.alpha_scheduler(scheduler_args)
         beta = self.beta_scheduler(scheduler_args)
 
@@ -347,7 +326,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
     # ===== phi =====
     @cached_property
     def phi_score(self) -> torch.Tensor:
-        return self.train.popularity_tensor(self._template_weight)
+        return self._train.popularity_tensor(self._template_weight)
 
     # ===== TS MAB =====
 
@@ -393,7 +372,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         return top_indices, top_scores
 
     def user_indices_to_mask(self, user_indices: list[int]) -> torch.tensor:
-        mask = torch.zeros(self.train.num_users, dtype=torch.bool)
+        mask = torch.zeros(self._train.num_users, dtype=torch.bool)
         mask[torch.tensor(user_indices)] = True
         return mask
 
@@ -405,10 +384,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         newly_opened: set[int],
         scheduler_args: CoefSchedulerArgs,
     ) -> torch.Tensor:
-        samples = self.calculate_scores(
+        return self.calculate_scores(
             user_indices, sent_indices, opened, newly_opened, scheduler_args
         )
-        return samples
 
     def final_metrics(
         self,
@@ -418,30 +396,17 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         sent_indices: list[int],
         final_predictions: torch.Tensor,
     ) -> list[ContextualBanditMetrics]:
-        binary_results: torch.Tensor = dataset[mailshot_id][
-            1
-        ]  # 1 because the 0 is masked for training
+        binary_results: torch.Tensor = dataset[mailshot_id]
         prediction = deepcopy(final_predictions)
-
-        # Put 1s for sent_indices
         prediction[sent_indices] = 1
-
-        # User indices mask
         user_mask = self.user_indices_to_mask(user_indices)
 
-        # User cluster tensor
-        # user_clusters = self.train.user_clusters.sort_values('user_id')['cluster'].tolist()
-        user_clusters = [0] * self.train.num_users
-
-        # Calculate metrics
-        metrics: list[ContextualBanditMetrics] = ContextualBanditMetrics.from_lists(
+        return ContextualBanditMetrics.from_lists(
             mailshot_id,
             user_mask.tolist(),
             binary_results.tolist(),
             prediction.tolist(),
-            user_clusters,
         )
-        return metrics
 
     @staticmethod
     def calculate_samples(s: torch.Tensor, G: float) -> torch.Tensor:

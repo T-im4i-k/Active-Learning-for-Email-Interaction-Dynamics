@@ -36,14 +36,6 @@ class ContextualBanditMetrics:
 
     @classmethod
     def from_csv_gz(cls, folder: Path, filename: str = "results.csv.gz") -> list[Self]:
-        """
-        Read a gz-compressed CSV located in *folder* / *filename* and
-        return a list of ContextualBanditMetrics – one per row.
-
-        Expected column names:
-            mailshot_id, present_in_prediction, opened, prediction,
-            user_cluster (optional), stage (optional)
-        """
         path = folder / filename
         if not path.exists():
             raise FileNotFoundError(path)
@@ -76,12 +68,11 @@ class ContextualBanditMetrics:
         present_in_prediction: list[bool],
         opened: list[bool],
         prediction: list[float],
-        user_clusters: list[int],
     ) -> list[Self]:
         return [
-            cls(mailshot_id, o, pred, p, cluster)
-            for p, o, pred, cluster in zip(
-                present_in_prediction, opened, prediction, user_clusters
+            cls(mailshot_id, o, pred, p)
+            for p, o, pred in zip(
+                present_in_prediction, opened, prediction
             )
         ]
 
