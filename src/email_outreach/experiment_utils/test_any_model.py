@@ -4,12 +4,10 @@ import re
 import sys
 from pathlib import Path
 
-from email_outreach.experiment_utils.experiment_constants import (
-    EXPERIMENT_RESULTS_FOLDER_NAME,
-)
-from email_outreach.sae_based_mab.sae_based_mab import (
-    ContextualBanditWithAutoencoder,
-)
+from email_outreach.experiment_utils.experiment_constants import \
+    EXPERIMENT_RESULTS_FOLDER_NAME
+from email_outreach.sae_based_mab.sae_based_mab import \
+    ContextualBanditWithAutoencoder
 
 logging.basicConfig(
     format="%(asctime)s : %(levelname)s : %(name)s : %(message)s",

@@ -10,21 +10,13 @@ from joblib import Parallel, delayed
 from sklearn.model_selection import ParameterSampler
 
 from email_outreach.experiment_utils.experiment_constants import (
-    EXPERIMENT_RESULTS_FOLDER_NAME,
-    get_experiment_folder_path,
-    get_test_folder_path,
-)
+    EXPERIMENT_RESULTS_FOLDER_NAME, get_experiment_folder_path,
+    get_test_folder_path)
 from email_outreach.sae_based_mab.config import (
-    ContextualBanditMetrics,
-    ContextualBanditWithAutoencoderConfig,
-)
-from email_outreach.sae_based_mab.dataset import (
-    AutoencoderDataset,
-)
+    ContextualBanditMetrics, ContextualBanditWithAutoencoderConfig)
+from email_outreach.sae_based_mab.dataset import AutoencoderDataset
 from email_outreach.sae_based_mab.metrics import (
-    calculate_auc,
-    calculate_recall_precision_at_quantiles,
-)
+    calculate_auc, calculate_recall_precision_at_quantiles)
 
 logger = logging.getLogger(__name__)
 

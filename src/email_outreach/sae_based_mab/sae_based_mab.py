@@ -1,39 +1,27 @@
 import logging
 from collections import defaultdict
 from copy import deepcopy
+from functools import cached_property
 from typing import Type
 
 import numpy as np
 import torch
 
-from functools import cached_property
-
-from email_outreach.experiment_utils.experiment_constants import (
-    CONTEXTUAL_BANDIT_FOLDER_NAME,
-)
-from email_outreach.sae_based_mab.abstract_mab import (
-    AbstractContextualModel,
-)
-from email_outreach.sae_based_mab.sae import ShallowAutoencoder
-from email_outreach.sae_based_mab.coef_scheduler import (
-    AbstractCoefScheduler,
-    AlphaSchedulerFactory,
-    BetaSchedulerFactory,
-    CoefSchedulerArgs,
-)
+from email_outreach.experiment_utils.experiment_constants import \
+    CONTEXTUAL_BANDIT_FOLDER_NAME
+from email_outreach.sae_based_mab.abstract_mab import AbstractContextualModel
+from email_outreach.sae_based_mab.coef_scheduler import (AbstractCoefScheduler,
+                                                         AlphaSchedulerFactory,
+                                                         BetaSchedulerFactory,
+                                                         CoefSchedulerArgs)
 from email_outreach.sae_based_mab.config import (
-    ContextualBanditMetrics,
-    ContextualBanditWithAutoencoderConfig,
-)
-from email_outreach.sae_based_mab.dataset import (
-    AutoencoderDataset,
-    PositiveAutoencoderDataset,
-    NegativeAutoencoderDataset,
-)
+    ContextualBanditMetrics, ContextualBanditWithAutoencoderConfig)
+from email_outreach.sae_based_mab.dataset import (AutoencoderDataset,
+                                                  NegativeAutoencoderDataset,
+                                                  PositiveAutoencoderDataset)
+from email_outreach.sae_based_mab.sae import ShallowAutoencoder
 from email_outreach.sae_based_mab.template_weight import (
-    AbstractTemplateWeight,
-    TemplateWeightFactory,
-)
+    AbstractTemplateWeight, TemplateWeightFactory)
 from email_outreach.utils.constants import ROOT_FOLDER
 
 logger = logging.getLogger(__name__)
@@ -46,6 +34,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         self.config = config
         self._autoencoder: ShallowAutoencoder | None = None
+        self._negative_autoencoder: ShallowAutoencoder | None = None
 
         self.alpha_scheduler: AbstractCoefScheduler = AlphaSchedulerFactory.from_config(
             config.to_dict()

@@ -1,9 +1,7 @@
 import re
 from pathlib import Path
 
-from email_outreach.sae_based_mab.sae_based_mab import (
-    ContextualBanditMetrics,
-)
+from email_outreach.sae_based_mab.sae_based_mab import ContextualBanditMetrics
 
 
 class ResultsFileFinder:

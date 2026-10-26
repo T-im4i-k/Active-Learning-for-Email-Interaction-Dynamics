@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import logging
+from functools import cached_property
 from itertools import accumulate, pairwise
 from typing import Self, Sequence
-from functools import cached_property
 
 import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from email_outreach.sae_based_mab.template_weight import (
-    AbstractTemplateWeight,
-)
+from email_outreach.sae_based_mab.template_weight import AbstractTemplateWeight
 from email_outreach.utils.data_loader_utils import load_data_for_sender
 
 logger = logging.getLogger(__name__)
