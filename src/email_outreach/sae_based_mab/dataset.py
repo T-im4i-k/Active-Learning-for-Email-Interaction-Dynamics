@@ -36,6 +36,12 @@ def _wide_matrices(
     ``mails["user_id"]`` must already be mapped to column indices. Duplicate
     (mailshot, user) rows are combined with ``max``, i.e. "any".
     """
+    if not mailshot_ids:
+        return (
+            np.zeros((0), dtype=np.float32),
+            np.zeros((0), dtype=np.float32),
+        )
+
     indicators = mails[["mailshot_id", "user_id"]].assign(
         opens=(mails["opened"] == 1).astype(np.float32),
         non_opens=(mails["opened"] == 0).astype(np.float32),
@@ -137,6 +143,13 @@ class AutoencoderDataset(Dataset):
         split_sizes: Sequence[int],
         remove_users_below_n_opens: int = 0,
     ) -> list[Self]:
+        """Chronological split: [train, *one dataset per entry of ``split_sizes``].
+
+        A size of 0 yields an empty dataset (no mailshots, but one column per
+        training user).
+        """
+        if any(size < 0 for size in split_sizes):
+            raise ValueError(f"split_sizes must be non-negative, got {list(split_sizes)}")
 
         logger.info("Loading data for sender %s", sender_id)
         mails = _clean_mails(load_data_for_sender(sender_id))
