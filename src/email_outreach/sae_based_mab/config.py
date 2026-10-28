@@ -8,6 +8,14 @@ from typing import Any, Literal, Self
 import pandas as pd
 
 
+def _parse_bool(value: str) -> bool:
+    v = value.strip().lower()
+    if v in ("true", "1", "1.0"):
+        return True
+    if v in ("false", "0", "0.0", ""):
+        return False
+    raise ValueError(f"Cannot parse bool from {value!r}")
+
 @dataclass
 class ContextualBanditMetrics:
     mailshot_id: int
@@ -48,8 +56,8 @@ class ContextualBanditMetrics:
                 instances.append(
                     cls(
                         mailshot_id=int(row["mailshot_id"]),
-                        present_in_prediction=bool(row["present_in_prediction"]),
-                        opened=bool(row["opened"]),
+                        present_in_prediction=_parse_bool(row["present_in_prediction"]),
+                        opened=_parse_bool(row["opened"]),
                         prediction=float(row["prediction"]),
                         stage=(
                             int(row["stage"])
