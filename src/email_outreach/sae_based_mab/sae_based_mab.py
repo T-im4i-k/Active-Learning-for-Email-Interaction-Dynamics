@@ -68,7 +68,10 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self._template_weight = TemplateWeightFactory.from_config(weight_config)
 
         self._autoencoder = ShallowAutoencoder(
-            n=train.num_users, d=self.config.d, dropout_p=self.config.dropout
+            n=train.num_users,
+            d=self.config.d,
+            dropout_p=self.config.dropout,
+            legacy=self.config.legacy_sae,
         )
 
         self._naive_f_partial: torch.Tensor = torch.zeros(train.num_users)
@@ -80,6 +83,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 n=train.num_users,
                 d=self.config.d,
                 dropout_p=self.config.dropout,
+                legacy=self.config.legacy_sae,
             )
 
             self._negative_autoencoder.fit(

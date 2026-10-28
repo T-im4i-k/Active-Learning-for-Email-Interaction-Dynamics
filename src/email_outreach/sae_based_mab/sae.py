@@ -16,8 +16,25 @@ from email_outreach.utils.common_utils import set_seed
 logger = logging.getLogger(__name__)
 
 
+class EarlyStopper:
+    def __init__(self, patience=5, min_delta=0.0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best = float("inf")
+        self.counter = 0
+
+    def __call__(self, metric):
+        """Returns True when training should stop."""
+        if metric < self.best - self.min_delta:
+            self.best = metric
+            self.counter = 0
+        else:
+            self.counter += 1
+        return self.counter >= self.patience
+
+
 class ShallowAutoencoder(nn.Module):
-    def __init__(self, n: int, d: int, dropout_p=0.0):
+    def __init__(self, n: int, d: int, dropout_p=0.0, legacy: bool = True):
         super().__init__()
         self.E = nn.Parameter(torch.empty(n, d))
         self.D = nn.Parameter(torch.empty(n, d))
@@ -28,6 +45,8 @@ class ShallowAutoencoder(nn.Module):
         self.dropout = nn.Dropout(p=dropout_p)
         self.bn = nn.LayerNorm(d)
         self.training_metrics = {"train_loss": [], "val_loss": []}
+
+        self.legacy: bool = legacy
 
     def logit(self, X):
         diag_vals = (self.E * self.D).sum(dim=1)
@@ -85,6 +104,8 @@ class ShallowAutoencoder(nn.Module):
         scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
         criterion = nn.BCELoss(reduction="none")
 
+        stop = EarlyStopper(patience=4)
+
         self.training_metrics = {"train_loss": [], "val_loss": []}
 
         for epoch in range(1, epochs + 1):
@@ -93,6 +114,9 @@ class ShallowAutoencoder(nn.Module):
 
             for batch_data, target_data in train_loader:
                 optimizer.zero_grad()
+
+                if self.legacy:
+                    target_data = batch_data
 
                 reconstruction = self.forward(batch_data)
                 loss_sum, count = self._weighted_bce(
@@ -125,6 +149,10 @@ class ShallowAutoencoder(nn.Module):
             print(
                 f"Epoch {epoch}/{epochs} - train_loss: {train_loss:.6f} - val_loss: {val_loss:.6f} - lr: {scheduler.get_last_lr()[0]:.2e}"
             )
+
+            should_stop: bool = stop(val_loss)
+            if not self.legacy and should_stop:
+                break
 
         return self.training_metrics
 

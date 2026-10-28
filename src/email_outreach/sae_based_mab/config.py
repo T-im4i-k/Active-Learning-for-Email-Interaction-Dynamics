@@ -16,6 +16,7 @@ def _parse_bool(value: str) -> bool:
         return False
     raise ValueError(f"Cannot parse bool from {value!r}")
 
+
 @dataclass
 class ContextualBanditMetrics:
     mailshot_id: int
@@ -113,6 +114,7 @@ class ContextualBanditWithAutoencoderConfig:
     negative_weight: float = 0.1
     f_confidence: float = 1.0
     negative_feedback_ratio: float = 0.1
+    legacy_sae: bool = True
 
     def to_dict(self):
         return {
@@ -140,6 +142,7 @@ class ContextualBanditWithAutoencoderConfig:
             "negative_weight": self.negative_weight,
             "f_confidence": self.f_confidence,
             "negative_feedback_ratio": self.negative_feedback_ratio,
+            "legacy_sae": self.legacy_sae,
         }
 
     @classmethod

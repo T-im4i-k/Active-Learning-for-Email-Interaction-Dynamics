@@ -149,7 +149,9 @@ class AutoencoderDataset(Dataset):
         training user).
         """
         if any(size < 0 for size in split_sizes):
-            raise ValueError(f"split_sizes must be non-negative, got {list(split_sizes)}")
+            raise ValueError(
+                f"split_sizes must be non-negative, got {list(split_sizes)}"
+            )
 
         logger.info("Loading data for sender %s", sender_id)
         mails = _clean_mails(load_data_for_sender(sender_id))
