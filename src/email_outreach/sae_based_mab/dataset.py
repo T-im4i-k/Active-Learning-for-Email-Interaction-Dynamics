@@ -64,7 +64,7 @@ def _wide_matrices(
     return to_matrix("opens"), to_matrix("non_opens")
 
 
-def _simulate_time_to_open(mails: pd.DataFrame) -> dict[int, pd.Series]:
+def _simulate_time_to_open(mails: pd.DataFrame, seed: int | None) -> dict[int, pd.Series]:
     pairs = mails.drop_duplicates(["mailshot_id", "user_id"], keep="last")
     mean_minutes = (
         pd.to_timedelta(pairs["time_to_open"]).dt.total_seconds().abs().to_numpy() / 60
@@ -72,7 +72,12 @@ def _simulate_time_to_open(mails: pd.DataFrame) -> dict[int, pd.Series]:
 
     observed = ~np.isnan(mean_minutes)
     simulated = np.full(len(pairs), np.inf)
-    simulated[observed] = np.random.exponential(mean_minutes[observed])
+
+    if seed is not None:
+        rng = np.random.default_rng(seed)
+        simulated[observed] = rng.exponential(mean_minutes[observed])
+    else:
+        simulated[observed] = np.random.exponential(mean_minutes[observed])
 
     by_pair = pairs[["mailshot_id", "user_id"]].assign(tto=simulated)
     return {
@@ -102,7 +107,9 @@ class AutoencoderDataset(Dataset):
         user_id_mapper: dict[int, int] | None = None,
         remove_users_below_n_opens: int = 0,
         sender_id: int | None = None,
+        seed: int | None = None,
     ) -> None:
+        self.seed = seed
         missing = set(REQUIRED_COLUMNS) - set(mails.columns)
         if missing:
             raise ValueError(f"`mails` is missing columns: {sorted(missing)}")
@@ -127,14 +134,14 @@ class AutoencoderDataset(Dataset):
         self.opens, self.non_opens = _wide_matrices(
             self.mails, self.mailshot_ids, self.num_users
         )
-        self._time_to_open = _simulate_time_to_open(self.mails)
+        self._time_to_open = _simulate_time_to_open(self.mails, self.seed)
 
     # ------------------------------------------------------------------ #
     # Constructors
     # ------------------------------------------------------------------ #
     @classmethod
-    def from_disk(cls, sender_id: int) -> Self:
-        return cls(load_data_for_sender(sender_id), sender_id=sender_id)
+    def from_disk(cls, sender_id: int, seed: int | None = None) -> Self:
+        return cls(load_data_for_sender(sender_id), sender_id=sender_id, seed=seed)
 
     @classmethod
     def from_disk_data_split(
@@ -142,6 +149,7 @@ class AutoencoderDataset(Dataset):
         sender_id: int,
         split_sizes: Sequence[int],
         remove_users_below_n_opens: int = 0,
+        seed: int | None = None,
     ) -> list[Self]:
         """Chronological split: [train, *one dataset per entry of ``split_sizes``].
 
@@ -168,13 +176,16 @@ class AutoencoderDataset(Dataset):
             for lo, hi in pairwise(edges)
         ]
 
+        rng = np.random.default_rng(seed=seed)
+
         train = cls(
             chunks[0],
             remove_users_below_n_opens=remove_users_below_n_opens,
             sender_id=sender_id,
+            seed=int(rng.integers(0, 2**32 - 1)),
         )
         others = [
-            cls(chunk, user_id_mapper=train.user_id_mapper, sender_id=sender_id)
+            cls(chunk, user_id_mapper=train.user_id_mapper, sender_id=sender_id, seed=int(rng.integers(0, 2**32 - 1)))
             for chunk in chunks[1:]
         ]
         return [train, *others]

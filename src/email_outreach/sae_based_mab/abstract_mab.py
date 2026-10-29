@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.model_selection import ParameterSampler
@@ -18,6 +19,8 @@ from email_outreach.sae_based_mab.config import (
 from email_outreach.sae_based_mab.dataset import AutoencoderDataset
 from email_outreach.sae_based_mab.metrics import (
     calculate_auc, calculate_recall_precision_at_quantiles)
+
+from email_outreach.utils.common_utils import set_seed
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +62,8 @@ class AbstractContextualModel(ABC):
             experiments_folder
         )
 
+        gen = np.random.default_rng(43)
+
         Parallel(n_jobs=n_jobs, verbose=10)(
             delayed(cls._run_single_test)(
                 sender_id=sender_id,
@@ -69,6 +74,7 @@ class AbstractContextualModel(ABC):
                 repetition=repetition,
                 i=i,
                 current_split_size=current_split_size,
+                seed = int(gen.integers(0, 2**32 - 1))
             )
             for repetition in range(repetitions)
             for i, current_split_size in enumerate(range(split_size, 0, -1))
@@ -85,7 +91,10 @@ class AbstractContextualModel(ABC):
         repetition,
         i,
         current_split_size,
+        seed: int
     ):
+        set_seed(seed)
+
         logger.info(
             f"Experiment {i + 1}/{split_size} - Repetition {repetition + 1}/{repetitions}"
         )
@@ -119,6 +128,8 @@ class AbstractContextualModel(ABC):
         random_state: int = 42,
     ) -> None:
 
+        gen = np.random.default_rng(random_state)
+
         logger.info(
             f"Starting grid search for {cls.MODEL_NAME} with {len(param_grid)} parameters"
         )
@@ -133,7 +144,7 @@ class AbstractContextualModel(ABC):
 
         logger.info(f"Loading dataset for sender_id {sender_id}...")
         datasets = AutoencoderDataset.from_disk_data_split(
-            sender_id, split_sizes=split_sizes, remove_users_below_n_opens=1
+            sender_id, split_sizes=split_sizes, remove_users_below_n_opens=1, seed=int(gen.integers(0, 2**32 - 1))
         )
         train, val = datasets[0], datasets[1]
         logger.info(
@@ -148,7 +159,7 @@ class AbstractContextualModel(ABC):
         else:
             grid = list(
                 ParameterSampler(
-                    param_grid, n_iter=n_samples, random_state=random_state
+                    param_grid, n_iter=n_samples, random_state=int(gen.integers(0, 2**32 - 1))
                 )
             )
 
@@ -170,9 +181,11 @@ class AbstractContextualModel(ABC):
             json.dump(metadata, f, indent=4)
 
         t0 = time.time()
+
+        seed_ = int(gen.integers(0, 2**32 - 1))
         results = Parallel(n_jobs=n_jobs, verbose=10)(
             delayed(cls._run_single_experiment)(
-                cfg_dict, exp_number, train, val, results_folder
+                cfg_dict, exp_number, train, val, results_folder, seed_
             )
             for exp_number, cfg_dict in enumerate(grid)
         )
@@ -191,7 +204,9 @@ class AbstractContextualModel(ABC):
         train: AutoencoderDataset,
         val: AutoencoderDataset,
         results_folder: Path,
+        random_state: int,
     ) -> dict[str, Any]:
+        set_seed(random_state)
 
         exp_folder = results_folder / f"exp_{exp_number}"
         exp_folder.mkdir(exist_ok=True, parents=True)

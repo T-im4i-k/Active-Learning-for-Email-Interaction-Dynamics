@@ -97,7 +97,6 @@ class ShallowAutoencoder(nn.Module):
         weight_decay,
         positive_weight,
     ):
-        set_seed(42)
         train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val, batch_size=batch_size, shuffle=False)
         optimizer = optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
