@@ -93,7 +93,10 @@ class AbstractContextualModel(ABC):
         current_split_size,
         seed: int
     ):
-        set_seed(seed)
+
+        gen = np.random.default_rng(seed)
+        
+        set_seed(int(gen.integers(0, 2**32 - 1)))
 
         logger.info(
             f"Experiment {i + 1}/{split_size} - Repetition {repetition + 1}/{repetitions}"
@@ -101,7 +104,7 @@ class AbstractContextualModel(ABC):
         datasets = AutoencoderDataset.from_disk_data_split(
             sender_id,
             split_sizes=[1, current_split_size - 1],
-            remove_users_below_n_opens=1,
+            remove_users_below_n_opens=1, seed = int(gen.integers(0, 2**32 - 1))
         )
         train, test = datasets[0], datasets[1]
         model = cls(config=config)

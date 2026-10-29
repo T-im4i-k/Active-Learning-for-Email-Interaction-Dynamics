@@ -96,7 +96,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 positive_weight=self.config.negative_weight,
             )
 
-            # np.save(ROOT_FOLDER / "additional_data" / "D" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
+            # np.save(ROOT_FOLDER / "additional_data" / "proj" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
+            # np.save(ROOT_FOLDER / "additional_data" / "proj" / "neg_sae_E.npy", self._negative_autoencoder.E.detach().numpy())
 
         self.autoencoder.fit(
             PositiveAutoencoderDataset(train, noise=self.config.noise),
@@ -108,7 +109,12 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             positive_weight=self.config.positive_weight,
         )
 
-        # np.save(ROOT_FOLDER / "additional_data" / "D" /"sae_D.npy", self.autoencoder.D.detach().numpy())
+        # np.save(ROOT_FOLDER / "additional_data" / "proj" /"sae_D.npy", self.autoencoder.D.detach().numpy())
+        # np.save(ROOT_FOLDER / "additional_data" / "proj" /"sae_E.npy", self.autoencoder.E.detach().numpy())
+        #
+        # np.save(ROOT_FOLDER / "additional_data" / "proj" /"X_pos.npy", self._train.opens)
+        # np.save(ROOT_FOLDER / "additional_data" / "proj" /"X_neg.npy", self._train.non_opens)
+
         logger.info("Autoencoder fitted")
 
     def predict(self, data: AutoencoderDataset) -> list[ContextualBanditMetrics]:
