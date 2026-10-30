@@ -252,10 +252,19 @@ class AutoencoderDataset(Dataset):
 
 class PositiveAutoencoderDataset(Dataset):
     def __init__(
-        self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0
+        self,
+        autoencoder_dataset: AutoencoderDataset,
+        noise: float = 0.0,
+        legacy: bool = True,
     ) -> None:
         self.dataset = autoencoder_dataset
         self.noise = noise
+        self.legacy = legacy
+        self.mask: torch.Tensor | None = None
+        if self.legacy and self.noise > 0.0:
+            self.mask = torch.bernoulli(
+                torch.full(tuple(self.dataset.shape), 1.0 - self.noise)
+            )
 
     def __len__(self) -> int:
         return len(self.dataset)
@@ -263,17 +272,29 @@ class PositiveAutoencoderDataset(Dataset):
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         x = torch.tensor(self.dataset[index], dtype=torch.float32)
         if self.noise > 0.0:
-            mask = torch.bernoulli(torch.full_like(x, 1.0 - self.noise))
+            if self.legacy:
+                mask = self.mask[index]
+            else:
+                mask = torch.bernoulli(torch.full_like(x, 1.0 - self.noise))
             return x * mask, x
         return x, x
 
 
 class NegativeAutoencoderDataset(Dataset):
     def __init__(
-        self, autoencoder_dataset: AutoencoderDataset, noise: float = 0.0
+        self,
+        autoencoder_dataset: AutoencoderDataset,
+        noise: float = 0.0,
+        legacy: bool = True,
     ) -> None:
         self.dataset = autoencoder_dataset
         self.noise = noise
+        self.legacy = legacy
+        self.mask: torch.Tensor | None = None
+        if self.legacy and self.noise > 0.0:
+            self.mask = torch.bernoulli(
+                torch.full(tuple(self.dataset.shape), 1.0 - self.noise)
+            )
 
     def __len__(self) -> int:
         return len(self.dataset)
@@ -281,6 +302,9 @@ class NegativeAutoencoderDataset(Dataset):
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         x = torch.tensor(self.dataset[index], dtype=torch.float32)
         if self.noise > 0.0:
-            mask = torch.bernoulli(torch.full_like(x, 1.0 - self.noise))
+            if self.legacy:
+                mask = self.mask[index]
+            else:
+                mask = torch.bernoulli(torch.full_like(x, 1.0 - self.noise))
             return x * mask, x
         return x, x

@@ -87,7 +87,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             )
 
             self._negative_autoencoder.fit(
-                NegativeAutoencoderDataset(train, noise=self.config.noise),
+                NegativeAutoencoderDataset(train, noise=self.config.noise, legacy=self.config.legacy_sae),
                 val=NegativeAutoencoderDataset(val),
                 epochs=self.config.epochs,
                 lr=self.config.lr,
@@ -100,7 +100,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             # np.save(ROOT_FOLDER / "additional_data" / "proj" / "neg_sae_E.npy", self._negative_autoencoder.E.detach().numpy())
 
         self.autoencoder.fit(
-            PositiveAutoencoderDataset(train, noise=self.config.noise),
+            PositiveAutoencoderDataset(train, noise=self.config.noise, legacy=self.config.legacy_sae),
             val=PositiveAutoencoderDataset(val),
             epochs=self.config.epochs,
             lr=self.config.lr,
