@@ -6,13 +6,29 @@ influences $\Sigma_{i,j}$ and therefore captures only the \emph{average}
 effect of openers, never their joint interaction. We instead pass the full
 current state through the trained network, in the spirit of nonlinear
 autoencoder-based collaborative-filtering predictors such as AutoRec
-\citep{sedhain2015autorec}:
+\citep{sedhain2015autorec}, and control its confidence by scaling the logit
+with $\gamma>0$, i.e.\ by applying a softmax-style temperature $1/\gamma$
+\citep{guo2017calibration}:
 \begin{equation}
 \label{eq:f-forward}
-f_j(t) = \sigma\big(x(t)^\top B_{E,D}\big)e_j = f_{\SAE}(x(t))\,e_j.
+f_j(t) = \sigma\big(\gamma\, z_j(t)\big),
+\qquad
+z_j(t) = x(t)^\top B_{E,D}\,e_j.
 \end{equation}
-Because $\sigma$ is nonlinear, $\sigma(x(t)^\top B_{E,D}) \ne
-x(t)^\top\sigma(B_{E,D})$ in general (equality holds only for one-hot
-$x(t)$), so Eq.~\eqref{eq:f-forward} is a genuinely different,
-jointly-conditioned probability estimate rather than a relabeling of
-Eq.~\eqref{eq:phi-p-f}.
+For $\gamma=1$ this is the plain forward pass $f_{\SAE}(x(t))\,e_j$. Because
+$\sigma$ is nonlinear, $\sigma(z_j(t)) \ne x(t)^\top\Sigma_{:j}$ in general
+(equality holds only for one-hot $x(t)$), so Eq.~\eqref{eq:f-forward} is a
+genuinely different, jointly-conditioned probability estimate rather than a
+relabeling of Eq.~\eqref{eq:phi-p-f}.
+
+\paragraph{Logit scaling.}
+Since $\sigma(0)=\tfrac12$, the neutral prior of the original SAE is
+preserved for every $\gamma$. For $\gamma<1$ scores contract toward
+$\tfrac12$, and for $\gamma>1$ they
+move away from it. Rescaling is
+warranted because the SAE is trained on complete rows of $X$, whereas
+$x(t)$ contains only the opens observed so far, so the confidence the
+network assigns to $z_j(t)$ cannot be taken at face value. We keep $\gamma$
+constant: as opens accumulate, $x(t)$ activates more rows of $B_{E,D}$, with
+entries of either sign, so $z_j(t)$ already evolves with the evidence and
+$\gamma$ acts only as a constant temperature on top of it.
