@@ -1,30 +1,47 @@
-\subsection{Factored Score $s_j(t) = \pi_j(t)\,u_j(t)$}
+\subsection{Factored Score with Scheduled Coefficients}
 \label{sec:factored-score}
 
-The linear combination in Eq.~\eqref{eq:score} conflates the two
-orthogonal axes noted in Section~\ref{sec:recap} --- it is not clear, for
-instance, why exploration should draw solely on historic data while
-exploitation draws solely on current data. We instead factor the score
-into a \emph{probability-of-opening} term and a \emph{utility-of-opening}
-term, each independently schedulable:
+The additive score in Eq.~\eqref{eq:score} ties exploration solely to
+historic data ($\phi_j p_j$) and exploitation solely to current data
+($f_j(t)$). We instead factor it into a probability-of-opening term and a
+utility-of-opening term, each with its own coefficient:
+\begin{align}
+\pi_j(t) &= \alpha(t)\,\phi_j + \big(1-\alpha(t)\big)\,f_j(t),
+  \label{eq:pi}\\
+u_j(t) &= \beta(t)\,p_j + \big(1-\beta(t)\big),
+  \label{eq:u}\\
+s_j(t) &= \pi_j(t)\,u_j(t).
+  \label{eq:s-factored}
+\end{align}
+$\pi_j(t)$ blends historic and current opening-probability estimates;
+$u_j(t)$ blends the direct value of an open (the constant $1$) with its
+indirect information value $p_j$. The refinements of
+Sections~\ref{sec:recency-phi}--\ref{sec:variance-p} enter $\phi_j$,
+$f_j(t)$ and $p_j$ unchanged.
+
+\paragraph{Scheduling.}
+The indirect value of an open shrinks as the sending budget is spent, and
+$f_j(t)$ becomes reliable as opens accumulate. Echoing decaying exploration
+in bandits \citep{auer2002finite}, we therefore schedule $\beta$ on
+$\mu = N(t)/N$, the fraction of the sending budget used, and $\alpha$ on
+$\tilde o = o(t)/m$, the fraction of recipients who have opened, with
+$o(t) = x(t)^\top\mathbf{1}$.
+
+\emph{Send-volume-based $\beta$ (log-linear).} Analogous to geometric
+cooling in simulated annealing \citep{mahdi2017performance},
 \begin{equation}
-\label{eq:pi-u}
-\pi_j(t) = \alpha(t)\phi_j + (1-\alpha(t))f_j(t),
-\qquad
-u_j(t) = \beta(t)p_j + (1-\beta(t))\cdot 1,
+\label{eq:beta-loglinear}
+\beta(\mu) = \beta_0^{\,1-\mu}\,\beta_1^{\,\mu},
+\qquad 0<\beta_1\le\beta_0\le 1,
 \end{equation}
+so $\log\beta$ is linear in $\mu$ and decays at a constant relative rate.
+
+\emph{Open-rate-based $\alpha$ (hyperbolic).}
 \begin{equation}
-\label{eq:s-factored}
-s_j(t) = \pi_j(t)\,u_j(t)
-       = \Big(\alpha(t)\phi_j + [1-\alpha(t)]f_j(t)\Big)
-         \Big(\beta(t)p_j + [1-\beta(t)]\Big).
+\label{eq:alpha-hyperbolic}
+\alpha(\tilde o) = \frac{\kappa}{\tilde o + \kappa},
+\qquad \kappa>0.
 \end{equation}
-Here $\pi_j(t)$ blends historic and current opening-probability estimates,
-while $u_j(t)$ blends the direct value of an open (the constant $1$) with
-its indirect information value $p_j$. This factorization reuses every
-primitive introduced above unchanged, so refinements from
-Sections~\ref{sec:alpha-scheduling}--\ref{sec:variance-p} can be dropped
-into $\pi_j(t)$ and $u_j(t)$ directly --- we use a confidence schedule
-(Eq.~\eqref{eq:alpha-confidence}) for $\alpha(t)$ and a send-volume
-schedule (Eq.~\eqref{eq:alpha-linear}/\eqref{eq:alpha-geometric}) for
-$\beta(t)$.
+Here $\alpha(0)=1$, since $f_j(t)$ carries no information before any opens,
+and $\alpha(\kappa)=\tfrac12$. As $\tilde o$ is bounded by the overall open
+rate ($9.1\%$ in \citealp{zid2025active}), $\kappa$ lives on that scale.
