@@ -270,7 +270,7 @@ class PositiveAutoencoderDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        x = torch.tensor(self.dataset[index], dtype=torch.float32)
+        x = torch.tensor(self.dataset.opens[index], dtype=torch.float32)
         if self.noise > 0.0:
             if self.legacy:
                 mask = self.mask[index]
@@ -300,7 +300,7 @@ class NegativeAutoencoderDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
-        x = torch.tensor(self.dataset[index], dtype=torch.float32)
+        x = torch.tensor(self.dataset.non_opens[index], dtype=torch.float32)
         if self.noise > 0.0:
             if self.legacy:
                 mask = self.mask[index]
