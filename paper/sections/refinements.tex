@@ -1,6 +1,18 @@
 \section{Proposed Refinements}
 \label{sec:refinements}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_pipeline.pdf}
+\caption{Pipeline of the SAE--TS framework with negative feedback. Opens
+$x^{+}(t)$ and sent-but-unopened recipients $x^{-}(t)$ are encoded by two SAEs,
+and their logits $z^{+}_j$, $z^{-}_j$ are blended into the confidence
+$f_j(t)$, which enters the arm score $s_j(t)$ used by Thompson Sampling to
+select the next batch.}
+\label{fig:pipeline}
+\end{figure*}
+
+
 \input{sections/refinements/recency_weighted_phi}
 \input{sections/refinements/forward_pass_f}
 \input{sections/refinements/negative_feedback}
