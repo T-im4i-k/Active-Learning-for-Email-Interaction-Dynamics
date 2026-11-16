@@ -21,6 +21,17 @@ state of template $n{+}1$ splits accordingly: $x^{+}(t)=x(t)$ marks
 recipients who have opened, and $x^{-}(t)\in\{0,1\}^m$ marks recipients who
 were sent the template in $[0,t)$ and have not opened it.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_pipeline.pdf}
+\caption{Pipeline of the SAE--TS framework with negative feedback. Opens
+$x^{+}(t)$ and sent-but-unopened recipients $x^{-}(t)$ are encoded by two SAEs,
+and their logits $z^{+}_j$, $z^{-}_j$ are blended into the confidence
+$f_j(t)$, which enters the arm score $s_j(t)$ used by Thompson Sampling to
+select the next batch.}
+\label{fig:pipeline}
+\end{figure*}
+
 \paragraph{Logit blending.}
 Let
 \begin{equation}
