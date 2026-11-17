@@ -1,3 +1,5 @@
+\input{tables/tab_results}
+
 \section{Experiments}
 \label{sec:experiments}
 
@@ -14,3 +16,13 @@ original model on our pipeline; at the operating points reported by
 \citet{zid2025active} (25/50/75\%) our reproduction matches the published
 point estimates exactly ($0.923$, $0.975$, $0.989$), with larger variance
 attributable to fewer simulation runs.
+
+\subsection{Results}
+\label{sec:results}
+
+Table~\ref{tab:results} reports the test-set results of the baseline and of
+each refinement, as mean $\pm$ std over $100$ simulation runs. Every refinement
+improves Recall-AUC over the baseline (by $1.19$ to $1.81$ percentage points),
+and the largest gains appear at the smallest sending fraction: at 5\% the
+improvement in recall ranges from $8.42$ to $13.39$ percentage points, while by
+35\% it is below $0.6$ percentage points for all variants.

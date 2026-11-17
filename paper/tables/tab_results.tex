@@ -1,0 +1,31 @@
+% Results table for Sec. \ref{sec:results}; \input from sections/refinements.tex
+% (not experiments.tex) so that the two-column float lands at the top of the page
+% where Experiments begins.
+\begin{table*}[t]
+\centering
+\caption{Test-set Recall@5/15/25/35\% and Recall-AUC of the baseline and of each
+proposed refinement (mean $\pm$ std over $100$ simulation runs). Best value per
+column in bold.}
+\label{tab:results}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Variant & Recall@5\% & Recall@15\% & Recall@25\% & Recall@35\% & Recall-AUC \\
+\midrule
+Baseline
+  & $0.3588 \pm 0.0782$ & $0.8185 \pm 0.0242$ & $0.9236 \pm 0.0125$ & $0.9593 \pm 0.0116$ & $0.8914 \pm 0.0118$ \\
+\midrule
+Forward-pass $f_j(t)$ (\S\ref{sec:forward-f})
+  & $0.4512 \pm 0.0472$ & $\mathbf{0.8519} \pm 0.0294$ & $\mathbf{0.9380} \pm 0.0190$ & $\mathbf{0.9651} \pm 0.0108$ & $0.9088 \pm 0.0114$ \\
+Negative feedback, second SAE (\S\ref{sec:negative-feedback})
+  & $0.4663 \pm 0.0432$ & $0.8507 \pm 0.0307$ & $0.9352 \pm 0.0202$ & $0.9647 \pm 0.0109$ & $\mathbf{0.9095} \pm 0.0110$ \\
+Recency-weighted $\phi_j$ (\S\ref{sec:recency-phi})
+  & $\mathbf{0.4927} \pm 0.0388$ & $0.8396 \pm 0.0251$ & $0.9306 \pm 0.0139$ & $0.9623 \pm 0.0106$ & $0.9083 \pm 0.0104$ \\
+Variance-based $p_j$ (\S\ref{sec:variance-p})
+  & $0.4566 \pm 0.0402$ & $0.8341 \pm 0.0263$ & $0.9292 \pm 0.0138$ & $0.9621 \pm 0.0106$ & $0.9046 \pm 0.0104$ \\
+Factored score, scheduled coeff. (\S\ref{sec:factored-score})
+  & $0.4430 \pm 0.0402$ & $0.8330 \pm 0.0269$ & $0.9294 \pm 0.0137$ & $0.9620 \pm 0.0106$ & $0.9033 \pm 0.0107$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
