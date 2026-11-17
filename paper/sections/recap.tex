@@ -10,11 +10,10 @@ recipients so as to maximize eventual openers reached early.
 
 \paragraph{Shallow autoencoder.}
 A SAE with encoder/decoder $E, D \in \R^{m\times d}$ is trained as
-\begin{equation*}
-\min_{E,D} \ell\big(X,\ \sigma(XB_{E,D})\big),
-\qquad
-B_{E,D} = ED^\top - \diag\big([E\odot D]\mathbf{1}_m\big),
-\end{equation*}
+\begin{align*}
+&\min_{E,D} \ \ell\big(X,\ \sigma(XB_{E,D})\big),\\
+&B_{E,D} = ED^\top - \diag\big([E\odot D]\mathbf{1}_m\big),
+\end{align*}
 with $\ell$ the element-wise binary cross-entropy and the diagonal
 constraint ruling out trivial self-prediction. We write
 $f_{\SAE}(x) = \sigma(x^\top B_{E,D})$ for the trained forward pass and
@@ -30,11 +29,11 @@ s_j(t) = \alpha\,\phi_j p_j + (1-\alpha) f_j(t),
 \end{equation}
 \begin{equation}
 \label{eq:phi-p-f}
-\phi_j = \frac1n\sum_{i=1}^n X_{i,j},
-\qquad
-p_j = \frac{1}{m-1}\sum_{i\ne j}\Sigma_{j,i},
-\qquad
-f_j(t) = \bar x(t)^\top \Sigma_{:j},
+\begin{aligned}
+\phi_j &= \frac1n\sum_{i=1}^n X_{i,j},\\
+p_j &= \frac{1}{m-1}\sum_{i\ne j}\Sigma_{j,i},\\
+f_j(t) &= \bar x(t)^\top \Sigma_{:j},
+\end{aligned}
 \end{equation}
 where $\phi_j$ is recipient $j$'s historic open rate, $p_j$ is a general
 influence score, $f_j(t)$ is a confidence score specific to template

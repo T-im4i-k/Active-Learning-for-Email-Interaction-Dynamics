@@ -8,10 +8,23 @@
 \DeclareMathOperator*{\argmin}{arg\,min}
 \newcommand{\SAE}{\mathrm{SAE}}
 
+% --- Sub-panel helper for composite figures ---------------------------------
+% \figpanel{<width>}{<pdf path without extension>}{<label>}
+% Includes the PDF if it exists; otherwise draws a grey placeholder box, so the
+% paper compiles before every panel is ready. Drop the PDF into figures/ and
+% the placeholder is replaced automatically.
+\newcommand{\figpanel}[3]{%
+  \begin{minipage}[b]{#1}
+    \centering
+    \IfFileExists{#2.pdf}%
+      {\includegraphics[width=\linewidth]{#2}}%
+      {\fbox{\parbox[c][1.114\linewidth][c]{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}%
+        {\centering\small\color{gray}Placeholder\\(panel #3)}}}\\[2pt]
+    {\small (#3)}
+  \end{minipage}}
+
 \begin{document}
 \let\WriteBookmarks\relax
-\def\floatpagepagefraction{1}
-\def\textpagefraction{.001}
 
 % Short title / authors for running heads
 \shorttitle{Refinements to the SAE--TS Framework for Email Outreach}
