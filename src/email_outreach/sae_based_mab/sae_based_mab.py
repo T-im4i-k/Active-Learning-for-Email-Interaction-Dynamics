@@ -59,6 +59,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         val: AutoencoderDataset,
     ) -> None:
 
+        # save_train_X(train)
+
         super().fit(train, val)
 
         weight_config = self.config.to_dict() | {
@@ -435,6 +437,14 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
 
 # ===== Additional =====
+
+def save_train_X(dataset: AutoencoderDataset):
+    np.save(
+        ROOT_FOLDER / "interpretability" / "data" / "x_train.npy",
+        np.array(dataset.opens, dtype=np.float64),
+    )
+
+    print("Saved x_train.npy")
 
 
 def max_p_sigma_rows(
