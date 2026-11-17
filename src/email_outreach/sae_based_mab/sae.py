@@ -36,6 +36,7 @@ class EarlyStopper:
 class ShallowAutoencoder(nn.Module):
     def __init__(self, n: int, d: int, dropout_p=0.0, legacy: bool = True):
         super().__init__()
+        self.n = n
         self.E = nn.Parameter(torch.empty(n, d))
         self.D = nn.Parameter(torch.empty(n, d))
 

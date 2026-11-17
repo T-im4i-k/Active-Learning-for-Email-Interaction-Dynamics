@@ -235,6 +235,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         all_averages = torch.cat(all_averages)
         all_variances = torch.cat(all_variances)
 
+        # max_p_sigma_rows(self.autoencoder, all_averages, all_variances)
+        # max_p_rank_flip_sigma_row(self.autoencoder, all_averages, all_variances)
+
         match self.config.p_type:
             case "mean":
                 return all_averages
@@ -445,9 +448,11 @@ def max_p_sigma_rows(
 
     max_average_row = autoencoder.predict(max_average_input)
     np.save(
-        ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "avg.npy",
+        ROOT_FOLDER / "interpretability" / "data" / "sigma_max_mean_p.npy",
         np.array(max_average_row.detach().numpy(), dtype=np.float64),
     )
+
+    print("Saved sigma_max_mean_p.npy")
 
     max_var_idx = torch.argmax(all_variances)
     max_var_input = torch.zeros(autoencoder.n)
@@ -455,9 +460,11 @@ def max_p_sigma_rows(
 
     max_var_row = autoencoder.predict(max_var_input)
     np.save(
-        ROOT_FOLDER / "additional_data" / "max_p_sigma_row" / "var.npy",
+        ROOT_FOLDER / "interpretability" / "data" / "sigma_max_var_p.npy",
         np.array(max_var_row.detach().numpy(), dtype=np.float64),
     )
+
+    print("Saved sigma_max_var_p.npy")
 
 
 def max_p_rank_flip_sigma_row(
@@ -478,16 +485,22 @@ def max_p_rank_flip_sigma_row(
 
     sigma_row = autoencoder.predict(biggest_rank_flip_vec.unsqueeze(0))
     np.save(
-        ROOT_FOLDER / "additional_data" / "p_scores" / f"rank_flip_sigma_row.npy",
+        ROOT_FOLDER / "interpretability" / "data" / f"sigma_max_rank_flip.npy",
         np.array(sigma_row.detach().numpy(), dtype=np.float64),
     )
 
+    print("Saved sigma_max_rank_flip.npy")
+
     np.save(
-        ROOT_FOLDER / "additional_data" / "p_scores" / f"p_mean.npy",
+        ROOT_FOLDER / "interpretability" / "data" / f"p_mean_max_rank_flip.npy",
         np.array(all_averages.detach().numpy(), dtype=np.float64),
     )
 
+    print("Saved p_mean_max_rank_flip.npy")
+
     np.save(
-        ROOT_FOLDER / "additional_data" / "p_scores" / f"p_var.npy",
+        ROOT_FOLDER / "interpretability" / "data" / f"p_var_max_rank_flip.npy",
         np.array(4 * all_variances.detach().numpy(), dtype=np.float64),
     )
+
+    print("Saved p_var_max_rank_flip.npy")
