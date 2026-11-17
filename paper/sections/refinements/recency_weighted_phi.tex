@@ -20,3 +20,25 @@ with half-life $h>0$, and redefine
 Normalizing by $\sum_i\omega_i$ keeps $\phi_j\in[0,1]$. As $h\to\infty$
 every $\omega_i\to1$, recovering the original unweighted average as a
 special case.
+
+Figure~\ref{fig:phi-p-s}a illustrates the drift that this weighting is meant
+to capture. For two selected recipients from each of four behavioral patterns
+found in the training data, it compares the unweighted $\phi_j$ (the right end
+of each curve) with the recency-weighted $\phi_j$ for $h=0.1$ (the marker at
+the right edge). \emph{Late bloomers} open nothing in the first 100 templates
+and about half of the last 29; the plain average ($0.14$ and $0.11$) underrates
+them, whereas the weighted rate ($0.33$ and $0.37$) reflects their current
+activity. \emph{Dropouts} are the mirror case: they open roughly nine in ten of
+the first 100 templates but at most one of the last 29, so the plain average
+($0.68$ and $0.65$) keeps ranking them highly, while the weighted rate ($0.18$
+and $0.11$) shows that they have gone quiet. The two \emph{intermittent}
+patterns show that a single average also blends regimes of very different
+activity. Recipients who opened, paused and then returned
+(on$\to$off$\to$on) have a plain average of only $0.27$ and $0.30$ because of
+the pause, although they opened $66\%$ and $59\%$ of the last 29 templates;
+their weighted rate is $0.52$ and $0.53$. Recipients who were active mainly
+in the middle of the history (off$\to$on$\to$off) still score $0.28$ and $0.21$
+although they have stopped opening, whereas their weighted rate is $0.11$ and
+$0.09$. Such shifts are not rare: in the training data, weighting with
+$h=0.1$ changes $\phi_j$ by more than $0.1$ for $10.4\%$ of recipients and by
+more than $0.05$ for $19.4\%$.
