@@ -47,6 +47,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         self._naive_f_partial: torch.Tensor | None = None
 
+        # self.pi_scores = []
+        # self.u_scores = []
+
     @property
     def autoencoder(self) -> ShallowAutoencoder:
         if self._autoencoder is None:
@@ -183,6 +186,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             for user, score in zip(already_sent, already_scored):
                 metrics[user].prediction = score
 
+            # save_pi_u(self.pi_scores, self.u_scores)
             all_metrics.extend(metrics)
 
         self.calculated_metrics = all_metrics
@@ -328,6 +332,9 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         u = beta * p + (1 - beta)
         s = pi * u
 
+        # self.pi_scores.append(pi)
+        # self.u_scores.append(u)
+
         return s
 
     def get_s(
@@ -337,7 +344,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         f: torch.Tensor,
         scheduler_args: CoefSchedulerArgs,
     ) -> torch.Tensor:
-        match self.config.revised_s:
+        match self.config.s_params["revised_s"]:
             case False:
                 return self.calculate_s(phi, p, f, scheduler_args)
             case True:
@@ -437,6 +444,21 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
 
 # ===== Additional =====
+
+def save_pi_u(pi_scores: list, u_scores: list):
+    np.save(
+        ROOT_FOLDER / "interpretability" / "data" / "pi_scores.npy",
+        np.array(pi_scores, dtype=np.float64),
+    )
+
+    print("Saved pi_scores.npy")
+
+    np.save(
+        ROOT_FOLDER / "interpretability" / "data" / "u_scores.npy",
+        np.array(u_scores, dtype=np.float64),
+    )
+
+    print("Saved u_scores.npy")
 
 def save_train_X(dataset: AutoencoderDataset):
     np.save(

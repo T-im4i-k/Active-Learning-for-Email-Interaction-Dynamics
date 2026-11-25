@@ -95,13 +95,12 @@ class ContextualBanditWithAutoencoderConfig:
     alpha_params: dict[str, Any] = field(
         default_factory=lambda: {"type": "constant", "alpha": 0.1}
     )
-    beta_params: dict[str, Any] = field(default_factory=lambda: {})
+    s_params: dict = lambda: {"revised_s": False, "beta_params": {}}
     template_weight_params: dict[str, Any] = field(
         default_factory=lambda: {"type": "uniform"}
     )
     G: float = 10000.0
     naive_f: bool = True
-    revised_s: bool = False
     T: int = 2880
     num_splits: int = 24
     sent_by_T: float = 0.15
@@ -125,11 +124,10 @@ class ContextualBanditWithAutoencoderConfig:
             "batch_size": self.batch_size,
             "positive_weight": self.positive_weight,
             "alpha_params": self.alpha_params,
-            "beta_params": self.beta_params,
+            "s_params": self.s_params,
             "template_weight_params": self.template_weight_params,
             "G": self.G,
             "naive_f": self.naive_f,
-            "revised_s": self.revised_s,
             "num_splits": self.num_splits,
             "T": self.T,
             "sent_by_T": self.sent_by_T,

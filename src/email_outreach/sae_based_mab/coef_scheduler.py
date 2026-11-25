@@ -123,10 +123,11 @@ class AlphaSchedulerFactory(AbstractSchedulerFactory):
 class BetaSchedulerFactory(AbstractSchedulerFactory):
     @classmethod
     def from_config(cls, config: dict) -> AbstractCoefScheduler | None:
-        if not config["beta_params"]:
+        s_params = config["s_params"]
+        if not s_params["beta_params"]:
             return None
 
-        beta_params: dict = config["beta_params"]
+        beta_params: dict = s_params["beta_params"]
         scheduler_type: str = beta_params["type"].lower()
 
         normal_batch_size = config["sent_by_T"] / config["num_splits"]
