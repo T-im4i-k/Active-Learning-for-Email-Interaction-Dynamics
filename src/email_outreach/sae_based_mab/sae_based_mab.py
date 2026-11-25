@@ -83,7 +83,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         logger.info("Fitting the autoencoder")
 
-        if self.config.double_sae:
+        if self.config.negative_feedback_params["double_sae"]:
             self._negative_autoencoder = ShallowAutoencoder(
                 n=train.num_users,
                 d=self.config.d,
@@ -98,7 +98,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                 lr=self.config.lr,
                 batch_size=self.config.batch_size,
                 weight_decay=self.config.wd,
-                positive_weight=self.config.negative_weight,
+                positive_weight=self.config.negative_feedback_params["negative_weight"],
             )
 
             # np.save(ROOT_FOLDER / "additional_data" / "proj" / "neg_sae_D.npy", self._negative_autoencoder.D.detach().numpy())
@@ -280,7 +280,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
         self, results: torch.Tensor, sent_indices: list[int]
     ) -> torch.Tensor:
 
-        if not self.config.double_sae:
+        if not self.config.negative_feedback_params["double_sae"]:
             current_f = torch.sigmoid(
                 self.autoencoder.predict_logit(results) * self.config.f_confidence
             )
@@ -294,8 +294,8 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
             neg_logit = self._negative_autoencoder.predict_logit(negative_results)
             current_f = torch.sigmoid(
                 (
-                    (1 - self.config.negative_feedback_ratio) * pos_logit
-                    - self.config.negative_feedback_ratio * neg_logit
+                    (1 - self.config.negative_feedback_params["negative_feedback_ratio"]) * pos_logit
+                    - self.config.negative_feedback_params["negative_feedback_ratio"] * neg_logit
                 )
                 * self.config.f_confidence
             )

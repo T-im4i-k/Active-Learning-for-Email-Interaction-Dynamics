@@ -95,7 +95,7 @@ class ContextualBanditWithAutoencoderConfig:
     alpha_params: dict[str, Any] = field(
         default_factory=lambda: {"type": "constant", "alpha": 0.1}
     )
-    s_params: dict = lambda: {"revised_s": False, "beta_params": {}}
+    s_params: dict = field(default_factory = lambda: {"revised_s": False, "beta_params": {}})
     template_weight_params: dict[str, Any] = field(
         default_factory=lambda: {"type": "uniform"}
     )
@@ -109,10 +109,10 @@ class ContextualBanditWithAutoencoderConfig:
     dropout: float = 0.0
     p_type: Literal["mean", "var", "std"] = "mean"
     noise: float = 0.0
-    double_sae: bool = False
-    negative_weight: float = 0.1
+    negative_feedback_params: dict = field(
+        default_factory=lambda: {"double_sae": False, "negative_weight": 0.1, "negative_feedback_ratio": 0.1}
+        )
     f_confidence: float = 1.0
-    negative_feedback_ratio: float = 0.1
     legacy_sae: bool = True
 
     def to_dict(self):
@@ -136,10 +136,8 @@ class ContextualBanditWithAutoencoderConfig:
             "j": self.j,
             "p_type": self.p_type,
             "noise": self.noise,
-            "double_sae": self.double_sae,
-            "negative_weight": self.negative_weight,
+            "negative_feedback_params": self.negative_feedback_params,
             "f_confidence": self.f_confidence,
-            "negative_feedback_ratio": self.negative_feedback_ratio,
             "legacy_sae": self.legacy_sae,
         }
 
