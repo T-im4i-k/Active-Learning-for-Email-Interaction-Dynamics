@@ -282,7 +282,7 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
 
         if not self.config.negative_feedback_params["double_sae"]:
             current_f = torch.sigmoid(
-                self.autoencoder.predict_logit(results) * self.config.f_confidence
+                self.autoencoder.predict_logit(results) * self.config.f_params["f_confidence"]
             )
         else:
             sent_tensor = torch.as_tensor(sent_indices, dtype=torch.long)
@@ -297,13 +297,13 @@ class ContextualBanditWithAutoencoder(AbstractContextualModel):
                     (1 - self.config.negative_feedback_params["negative_feedback_ratio"]) * pos_logit
                     - self.config.negative_feedback_params["negative_feedback_ratio"] * neg_logit
                 )
-                * self.config.f_confidence
+                * self.config.f_params["f_confidence"]
             )
 
         return current_f
 
     def get_f(self, opened, newly_opened, sent_indices: list[int]) -> torch.Tensor:
-        match self.config.naive_f:
+        match self.config.f_params["naive_f"]:
             case True:
                 return self.calculate_f(opened, newly_opened)
             case False:

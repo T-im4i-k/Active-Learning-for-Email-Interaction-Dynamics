@@ -100,7 +100,7 @@ class ContextualBanditWithAutoencoderConfig:
         default_factory=lambda: {"type": "uniform"}
     )
     G: float = 10000.0
-    naive_f: bool = True
+    f_params: dict = field(default_factory=lambda: {"naive_f": True, "f_confidence": 1.0})
     T: int = 2880
     num_splits: int = 24
     sent_by_T: float = 0.15
@@ -112,7 +112,6 @@ class ContextualBanditWithAutoencoderConfig:
     negative_feedback_params: dict = field(
         default_factory=lambda: {"double_sae": False, "negative_weight": 0.1, "negative_feedback_ratio": 0.1}
         )
-    f_confidence: float = 1.0
     legacy_sae: bool = True
 
     def to_dict(self):
@@ -127,7 +126,7 @@ class ContextualBanditWithAutoencoderConfig:
             "s_params": self.s_params,
             "template_weight_params": self.template_weight_params,
             "G": self.G,
-            "naive_f": self.naive_f,
+            "f_params": self.f_params,
             "num_splits": self.num_splits,
             "T": self.T,
             "sent_by_T": self.sent_by_T,
@@ -137,7 +136,6 @@ class ContextualBanditWithAutoencoderConfig:
             "p_type": self.p_type,
             "noise": self.noise,
             "negative_feedback_params": self.negative_feedback_params,
-            "f_confidence": self.f_confidence,
             "legacy_sae": self.legacy_sae,
         }
 
