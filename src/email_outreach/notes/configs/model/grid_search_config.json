@@ -1,0 +1,261 @@
+{
+    "sender_id": 1,
+    "model": "contextual_bandit",
+    "version": "model",
+    "split_sizes": [
+        5,
+        10
+    ],
+    "param_grid": {
+        "d": [
+            12,
+            16,
+            20
+        ],
+        "epochs": [
+            20,
+            30,
+            40
+        ],
+        "lr": [
+            0.02,
+            0.01,
+            0.005
+        ],
+        "wd": [
+            0.0001,
+            0.001
+        ],
+        "batch_size": [
+            16
+        ],
+        "positive_weight": [
+            50.0,
+            100.0,
+            150.0
+        ],
+        "alpha_params": [
+            {
+                "type": "constant",
+                "alpha": 0.05
+            },
+            {
+                "type": "constant",
+                "alpha": 0.1
+            },
+            {
+                "type": "constant",
+                "alpha": 0.2
+            },
+            {
+                "type": "adaptive",
+                "dumping": 0.001
+            },
+            {
+                "type": "adaptive",
+                "dumping": 0.005
+            },
+            {
+                "type": "adaptive",
+                "dumping": 0.01
+            },
+            {
+                "type": "adaptive",
+                "dumping": 0.03
+            }
+        ],
+        "template_weight_params": [
+            {
+                "type": "uniform"
+            },
+            {
+                "type": "exponential",
+                "half_life": 0.1
+            },
+            {
+                "type": "exponential",
+                "half_life": 0.2
+            },
+            {
+                "type": "exponential",
+                "half_life": 0.5
+            },
+            {
+                "type": "exponential",
+                "half_life": 1.0
+            },
+            {
+                "type": "exponential",
+                "half_life": 2.0
+            },
+            {
+                "type": "exponential",
+                "half_life": 4.0
+            }
+        ],
+        "G": [
+            5000.0,
+            10000.0,
+            20000.0
+        ],
+        "s_params": [
+            {
+                "revised_s": false,
+                "beta_params": {}
+            },
+            {
+                "revised_s": true,
+                "beta_params": {
+                    "type": "geometric",
+                    "left_bound": 0.8,
+                    "right_bound": 0.3
+                }
+            },
+            {
+                "revised_s": true,
+                "beta_params": {
+                    "type": "geometric",
+                    "left_bound": 0.6,
+                    "right_bound": 0.4
+                }
+            },
+            {
+                "revised_s": true,
+                "beta_params": {
+                    "type": "geometric",
+                    "left_bound": 0.4,
+                    "right_bound": 0.01
+                }
+            },
+            {
+                "revised_s": true,
+                "beta_params": {
+                    "type": "geometric",
+                    "left_bound": 0.2,
+                    "right_bound": 0.1
+                }
+            },
+            {
+                "revised_s": true,
+                "beta_params": {
+                    "type": "geometric",
+                    "left_bound": 0.1,
+                    "right_bound": 0.005
+                }
+            }
+        ],
+        "T": [
+            2880
+        ],
+        "num_splits": [
+            24
+        ],
+        "sent_by_T": [
+            0.15
+        ],
+        "sent_after_T": [
+            0.1
+        ],
+        "dropout": [
+            0.0,
+            0.3
+        ],
+        "p_type": [
+            "mean",
+            "var"
+        ],
+        "noise": [
+            0.0,
+            0.2,
+            0.4
+        ],
+        "negative_feedback_params": [
+            {
+                "double_sae": false,
+                "negative_feedback_ratio": 0.1,
+                "negative_weight": 0.1
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.1,
+                "negative_weight": 0.01
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.3,
+                "negative_weight": 0.01
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.5,
+                "negative_weight": 0.01
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.1,
+                "negative_weight": 0.1
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.3,
+                "negative_weight": 0.1
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.5,
+                "negative_weight": 0.1
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.1,
+                "negative_weight": 1.0
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.3,
+                "negative_weight": 1.0
+            },
+            {
+                "double_sae": true,
+                "negative_feedback_ratio": 0.5,
+                "negative_weight": 1.0
+            }
+        ],
+        "f_params": [
+            {
+                "naive_f": true,
+                "f_confidence": 1.0
+            },
+            {
+                "naive_f": false,
+                "f_confidence": 0.1
+            },
+            {
+                "naive_f": false,
+                "f_confidence": 0.2
+            },
+            {
+                "naive_f": false,
+                "f_confidence": 0.3
+            },
+            {
+                "naive_f": false,
+                "f_confidence": 0.5
+            },
+            {
+                "naive_f": false,
+                "f_confidence": 0.7
+            },
+            {
+                "naive_f": false,
+                "f_confidence": 1.0
+            }
+        ],
+        "legacy_sae": [
+            false
+        ]
+    },
+    "n_samples": 256,
+    "n_jobs": 2,
+    "random_state": 42
+}

@@ -1,0 +1,683 @@
+{
+    "total_experiments": 256,
+    "elapsed_time_seconds": 38774.90253663063,
+    "best_score": 0.9051602140655131,
+    "best_config": {
+        "wd": 0.001,
+        "template_weight_params": {
+            "type": "exponential",
+            "half_life": 0.2
+        },
+        "sent_by_T": 0.15,
+        "sent_after_T": 0.1,
+        "s_params": {
+            "revised_s": true,
+            "beta_params": {
+                "type": "geometric",
+                "left_bound": 0.1,
+                "right_bound": 0.005
+            }
+        },
+        "positive_weight": 50.0,
+        "p_type": "mean",
+        "num_splits": 24,
+        "noise": 0.2,
+        "negative_feedback_params": {
+            "double_sae": false,
+            "negative_feedback_ratio": 0.1,
+            "negative_weight": 0.1
+        },
+        "lr": 0.005,
+        "legacy_sae": false,
+        "f_params": {
+            "naive_f": false,
+            "f_confidence": 0.3
+        },
+        "epochs": 30,
+        "dropout": 0.0,
+        "d": 20,
+        "batch_size": 16,
+        "alpha_params": {
+            "type": "constant",
+            "alpha": 0.2
+        },
+        "T": 2880,
+        "G": 5000.0
+    },
+    "top_results": [
+        {
+            "experiment_number": 2,
+            "score": 0.9051602140655131,
+            "recalls": [
+                0.9927945053049447,
+                0.9862437041386319,
+                0.9682688844406279,
+                0.9525384448372348,
+                0.9221266294693373,
+                0.8388405088906894,
+                0.4898414418331951
+            ],
+            "precisions": [
+                0.04932796004211071,
+                0.05553423611331853,
+                0.08180128333578567,
+                0.11493234665132768,
+                0.1557607781449841,
+                0.23619277296884297,
+                0.41244024666209755
+            ],
+            "config": {
+                "wd": 0.001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 0.2
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": true,
+                    "beta_params": {
+                        "type": "geometric",
+                        "left_bound": 0.1,
+                        "right_bound": 0.005
+                    }
+                },
+                "positive_weight": 50.0,
+                "p_type": "mean",
+                "num_splits": 24,
+                "noise": 0.2,
+                "negative_feedback_params": {
+                    "double_sae": false,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 0.1
+                },
+                "lr": 0.005,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.3
+                },
+                "epochs": 30,
+                "dropout": 0.0,
+                "d": 20,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "constant",
+                    "alpha": 0.2
+                },
+                "T": 2880,
+                "G": 5000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 141,
+            "score": 0.9048130934405697,
+            "recalls": [
+                0.9927786393176327,
+                0.9864530505203676,
+                0.9686747875382273,
+                0.9521308805490843,
+                0.9249090509698702,
+                0.8517089414988354,
+                0.466432395000828
+            ],
+            "precisions": [
+                0.049320900605338516,
+                0.05554223660193918,
+                0.08182928485557665,
+                0.11489805999853726,
+                0.15624080407323046,
+                0.23969958432652122,
+                0.39340027353123036
+            ],
+            "config": {
+                "wd": 0.0001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 0.1
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": false,
+                    "beta_params": {}
+                },
+                "positive_weight": 150.0,
+                "p_type": "mean",
+                "num_splits": 24,
+                "noise": 0.0,
+                "negative_feedback_params": {
+                    "double_sae": false,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 0.1
+                },
+                "lr": 0.02,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.5
+                },
+                "epochs": 20,
+                "dropout": 0.0,
+                "d": 20,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.005
+                },
+                "T": 2880,
+                "G": 5000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 152,
+            "score": 0.9046145516444043,
+            "recalls": [
+                0.9936817811589013,
+                0.9876042732120193,
+                0.9702384867857,
+                0.9506419681800417,
+                0.9209927036620424,
+                0.8395082190725341,
+                0.473819057936742
+            ],
+            "precisions": [
+                0.04937031570859313,
+                0.05561157447816906,
+                0.08195329249611528,
+                0.11470376262013221,
+                0.1555767669453869,
+                0.2362461194768282,
+                0.3994800838514636
+            ],
+            "config": {
+                "wd": 0.0001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 0.1
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": true,
+                    "beta_params": {
+                        "type": "geometric",
+                        "left_bound": 0.1,
+                        "right_bound": 0.005
+                    }
+                },
+                "positive_weight": 100.0,
+                "p_type": "var",
+                "num_splits": 24,
+                "noise": 0.4,
+                "negative_feedback_params": {
+                    "double_sae": true,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 1.0
+                },
+                "lr": 0.02,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.2
+                },
+                "epochs": 30,
+                "dropout": 0.0,
+                "d": 16,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.001
+                },
+                "T": 2880,
+                "G": 20000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 244,
+            "score": 0.9042447069987227,
+            "recalls": [
+                0.9919030380068332,
+                0.9862401536018903,
+                0.969204828453602,
+                0.9503275113959716,
+                0.919435576056096,
+                0.8351411346033236,
+                0.481372394041612
+            ],
+            "precisions": [
+                0.04928560439071406,
+                0.05553690294014651,
+                0.08187328765598713,
+                0.11467519038337014,
+                0.15532075054826672,
+                0.235059416371883,
+                0.406080165693175
+            ],
+            "config": {
+                "wd": 0.001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 0.1
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": true,
+                    "beta_params": {
+                        "type": "geometric",
+                        "left_bound": 0.1,
+                        "right_bound": 0.005
+                    }
+                },
+                "positive_weight": 100.0,
+                "p_type": "mean",
+                "num_splits": 24,
+                "noise": 0.2,
+                "negative_feedback_params": {
+                    "double_sae": true,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 1.0
+                },
+                "lr": 0.02,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.7
+                },
+                "epochs": 20,
+                "dropout": 0.0,
+                "d": 20,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.03
+                },
+                "T": 2880,
+                "G": 20000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 61,
+            "score": 0.9034981135177861,
+            "recalls": [
+                0.9914426910321638,
+                0.9850244846694514,
+                0.9677894925471142,
+                0.9538294654187429,
+                0.9165290043063364,
+                0.8310314766530292,
+                0.49254451295550933
+            ],
+            "precisions": [
+                0.049259720415700245,
+                0.05546489801525437,
+                0.08174127861544392,
+                0.11509807145332099,
+                0.1548407251839332,
+                0.2339261084436157,
+                0.41584045647330625
+            ],
+            "config": {
+                "wd": 0.001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 0.5
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": false,
+                    "beta_params": {}
+                },
+                "positive_weight": 50.0,
+                "p_type": "var",
+                "num_splits": 24,
+                "noise": 0.0,
+                "negative_feedback_params": {
+                    "double_sae": false,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 0.1
+                },
+                "lr": 0.02,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.3
+                },
+                "epochs": 40,
+                "dropout": 0.0,
+                "d": 20,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.001
+                },
+                "T": 2880,
+                "G": 5000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 142,
+            "score": 0.9032590997084265,
+            "recalls": [
+                0.9922025704291897,
+                0.9864019111178138,
+                0.9693814932107336,
+                0.9525244330706719,
+                0.9199724644519961,
+                0.8374417671626709,
+                0.46268663616126937
+            ],
+            "precisions": [
+                0.04929736979152035,
+                0.055547570415729594,
+                0.08188528829583824,
+                0.11494377734737898,
+                0.15541675686682202,
+                0.2356994272523934,
+                0.3894001694757427
+            ],
+            "config": {
+                "wd": 0.001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 2.0
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": true,
+                    "beta_params": {
+                        "type": "geometric",
+                        "left_bound": 0.1,
+                        "right_bound": 0.005
+                    }
+                },
+                "positive_weight": 100.0,
+                "p_type": "mean",
+                "num_splits": 24,
+                "noise": 0.2,
+                "negative_feedback_params": {
+                    "double_sae": true,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 1.0
+                },
+                "lr": 0.01,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.1
+                },
+                "epochs": 20,
+                "dropout": 0.0,
+                "d": 20,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.001
+                },
+                "T": 2880,
+                "G": 20000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 60,
+            "score": 0.9030828405242951,
+            "recalls": [
+                0.991805628684192,
+                0.9859482620235814,
+                0.9678741580113842,
+                0.9514376144930267,
+                0.917444021227213,
+                0.8344731291950771,
+                0.4787897634656776
+            ],
+            "precisions": [
+                0.04927383882540314,
+                0.05551823500232538,
+                0.08176128045547683,
+                0.11481234142047259,
+                0.1549927311057232,
+                0.23487273494677238,
+                0.4033202834855853
+            ],
+            "config": {
+                "wd": 0.001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 2.0
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": true,
+                    "beta_params": {
+                        "type": "geometric",
+                        "left_bound": 0.1,
+                        "right_bound": 0.005
+                    }
+                },
+                "positive_weight": 50.0,
+                "p_type": "mean",
+                "num_splits": 24,
+                "noise": 0.4,
+                "negative_feedback_params": {
+                    "double_sae": true,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 1.0
+                },
+                "lr": 0.005,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.5
+                },
+                "epochs": 20,
+                "dropout": 0.0,
+                "d": 20,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.001
+                },
+                "T": 2880,
+                "G": 10000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 245,
+            "score": 0.9030124409223219,
+            "recalls": [
+                0.9936164574790851,
+                0.9893742303951658,
+                0.9708759464645839,
+                0.9514724396481558,
+                0.9131401128237009,
+                0.8309445346480774,
+                0.47035362984281864
+            ],
+            "precisions": [
+                0.04936796271896831,
+                0.05571024751863173,
+                0.08201329665611835,
+                0.11480662687470909,
+                0.15424868821753898,
+                0.23385938185890798,
+                0.3968801714967171
+            ],
+            "config": {
+                "wd": 0.0001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 0.1
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": false,
+                    "beta_params": {}
+                },
+                "positive_weight": 100.0,
+                "p_type": "var",
+                "num_splits": 24,
+                "noise": 0.2,
+                "negative_feedback_params": {
+                    "double_sae": true,
+                    "negative_feedback_ratio": 0.3,
+                    "negative_weight": 0.01
+                },
+                "lr": 0.005,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.3
+                },
+                "epochs": 40,
+                "dropout": 0.0,
+                "d": 12,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.001
+                },
+                "T": 2880,
+                "G": 5000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 6,
+            "score": 0.9030074985559078,
+            "recalls": [
+                0.9938581342027579,
+                0.9875889331951279,
+                0.9703668471426983,
+                0.9523742865024536,
+                0.9203931655230814,
+                0.8249786392408627,
+                0.47239344706400044
+            ],
+            "precisions": [
+                0.049375021863758195,
+                0.055608907482663214,
+                0.08196529333619887,
+                0.11493806377959517,
+                0.15548076246510634,
+                0.23224599920931638,
+                0.39832008848028333
+            ],
+            "config": {
+                "wd": 0.0001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 0.1
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": false,
+                    "beta_params": {}
+                },
+                "positive_weight": 50.0,
+                "p_type": "var",
+                "num_splits": 24,
+                "noise": 0.0,
+                "negative_feedback_params": {
+                    "double_sae": true,
+                    "negative_feedback_ratio": 0.1,
+                    "negative_weight": 0.1
+                },
+                "lr": 0.005,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.7
+                },
+                "epochs": 40,
+                "dropout": 0.0,
+                "d": 16,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "adaptive",
+                    "dumping": 0.001
+                },
+                "T": 2880,
+                "G": 5000.0
+            },
+            "n_metrics": 651145
+        },
+        {
+            "experiment_number": 237,
+            "score": 0.9029369340099906,
+            "recalls": [
+                0.9929273446217167,
+                0.9878929078354582,
+                0.9710052845217938,
+                0.9556918826840421,
+                0.9206467125919199,
+                0.8350728102764963,
+                0.45187988835120757
+            ],
+            "precisions": [
+                0.049330313220017526,
+                0.05562490854034907,
+                0.08202129705641925,
+                0.115338087045931,
+                0.15552076030686773,
+                0.23503275417396283,
+                0.3792001234624822
+            ],
+            "config": {
+                "wd": 0.0001,
+                "template_weight_params": {
+                    "type": "exponential",
+                    "half_life": 2.0
+                },
+                "sent_by_T": 0.15,
+                "sent_after_T": 0.1,
+                "s_params": {
+                    "revised_s": true,
+                    "beta_params": {
+                        "type": "geometric",
+                        "left_bound": 0.2,
+                        "right_bound": 0.1
+                    }
+                },
+                "positive_weight": 50.0,
+                "p_type": "var",
+                "num_splits": 24,
+                "noise": 0.2,
+                "negative_feedback_params": {
+                    "double_sae": true,
+                    "negative_feedback_ratio": 0.3,
+                    "negative_weight": 0.1
+                },
+                "lr": 0.02,
+                "legacy_sae": false,
+                "f_params": {
+                    "naive_f": false,
+                    "f_confidence": 0.3
+                },
+                "epochs": 40,
+                "dropout": 0.0,
+                "d": 16,
+                "batch_size": 16,
+                "alpha_params": {
+                    "type": "constant",
+                    "alpha": 0.05
+                },
+                "T": 2880,
+                "G": 5000.0
+            },
+            "n_metrics": 651145
+        }
+    ]
+}

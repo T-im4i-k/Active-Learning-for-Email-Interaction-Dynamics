@@ -1,0 +1,42 @@
+{
+    "wd": 0.001,
+    "template_weight_params": {
+        "type": "exponential",
+        "half_life": 0.2
+    },
+    "sent_by_T": 0.15,
+    "sent_after_T": 0.1,
+    "s_params": {
+        "revised_s": true,
+        "beta_params": {
+            "type": "geometric",
+            "left_bound": 0.1,
+            "right_bound": 0.005
+        }
+    },
+    "positive_weight": 50.0,
+    "p_type": "mean",
+    "num_splits": 24,
+    "noise": 0.2,
+    "negative_feedback_params": {
+        "double_sae": false,
+        "negative_feedback_ratio": 0.1,
+        "negative_weight": 0.1
+    },
+    "lr": 0.005,
+    "legacy_sae": false,
+    "f_params": {
+        "naive_f": false,
+        "f_confidence": 0.3
+    },
+    "epochs": 30,
+    "dropout": 0.0,
+    "d": 20,
+    "batch_size": 16,
+    "alpha_params": {
+        "type": "constant",
+        "alpha": 0.2
+    },
+    "T": 2880,
+    "G": 5000.0
+}
